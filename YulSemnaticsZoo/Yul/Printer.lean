@@ -59,6 +59,12 @@ def render : List Piece → List Char
   | .line k :: ps => '\n' :: List.replicate k ' ' ++ render ps
   | .tok t :: ps => t.chars ++ sepBefore t ps ++ render ps
 
+/-- the tokens of pieces, without the new lines -/
+def tokens (ps : List Piece) : List Token :=
+  ps.filterMap fun p => match p with
+    | .tok t => some t
+    | .line _ => none
+
 def word (s : String) : Piece := .tok (.Word s)
 def sym (s : Symbol) : Piece := .tok (.Sym s)
 

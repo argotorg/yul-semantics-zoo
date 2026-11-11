@@ -21,6 +21,32 @@ def result : Except String String → Option String
 #guard ["let function := 1", "x := 12ab", "x := \"abc", "let x : u256 := 1", "let := 1"].all
   fun s => result ((Statement.parse s).map (·.print)) == none
 
+-- where the docs grammar and solc 0.8.33 differ, as solc: only a call is an expression
+-- statement, a decimal number has no leading zero, a declared name does not end with `.`, a
+-- backslash before a new line in a string is no character, a hex literal can have one `_`
+-- between two pairs of digits, and function parameters can end with a comma
+#guard ["x", "\"abc\"", "let x := 024", "let x := 00", "let x. := 1", "f(1,)", "let x := 1_000",
+  "let x := hex\"0_011\"", "let x := hex\"_0011\"", "let x := hex\"0011_\"",
+  "let x := hex\"00__11\"",
+  "function f(,) {}"].all fun s => result ((Statement.parse s).map (·.print)) == none
+#guard ["f()", "let x := 0", "let x := 0x00", "let x.y := 1", "x. := 1", "f.()",
+  "let s := \"a\\\nb\\\r\nc\\\rd\"", "let x := hex\"00_11_22\"",
+  "function f(a,) {}"].map (fun s => result ((Statement.parse s).map (·.print))) ==
+  ["f()", "let x := 0", "let x := 0", "let x.y := 1", "x. := 1", "f.()", "let s := \"abcd\"",
+   "let x := \"\\x00\\x11\\\"\"",
+   "function f(a) { }"].map some
+
+-- as in solc: a name of an object or data is not empty and not the name of the object that
+-- contains it, and the objects and data in an object have different names
+#guard ["object \"\" { code { } }", "object \"A\" { code { } data \"\" \"\" }",
+  "object \"A\" { code { } object \"A\" { code { } } }",
+  "object \"A\" { code { } data \"A\" \"\" }",
+  "object \"A\" { code { } object \"B\" { code { } } data \"B\" \"\" }"].all
+  fun s => result ((Object.parse s).map (·.print)) == none
+#guard result ((Object.parse
+    "object \"A\" { code { } object \"B\" { code { } object \"A\" { code { } } } }").map (·.print))
+  != none
+
 example : ([yul| { let x := add(1, 2) } |] : Block) =
     ⟨[.VariableDeclaration ["x"] (some (.FunctionCall "add"
       [.Literal (.NumberLiteral 1), .Literal (.NumberLiteral 2)]))]⟩ := rfl

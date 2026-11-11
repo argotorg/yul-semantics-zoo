@@ -9,6 +9,9 @@ lower: `parseStatements`, `parseStatement`, `parseBlock`. So `3 * tokens + 1` is
 
 After a word, the next token tells the statement: `(` starts a function call, `,` or `:=` an
 assignment.
+
+Where the grammar and solc 0.8.33 differ, it parses as solc: only a call is an expression
+statement, a declared name does not end with `.`, and function parameters can end with a comma.
 -/
 
 namespace Yul
@@ -17,7 +20,11 @@ def keywords : List String :=
   ["function", "let", "if", "switch", "case", "default", "for", "break", "continue", "leave",
    "true", "false", "hex"]
 
+/-- an identifier: a word that is not a keyword -/
 def validIdent (s : String) : Bool := isWord s && !keywords.contains s
+
+/-- a name that a declaration declares: an identifier that does not end with `.` (as in solc) -/
+def validName (s : String) : Bool := validIdent s && s.toList.getLast? != some '.'
 
 def describe : List Token → String
   | t :: _ => s!"unexpected {repr t}"
@@ -27,29 +34,45 @@ def expect (t : Token) : List Token → Except String (List Token)
   | u :: r => if u = t then .ok r else .error s!"expected {repr t}, {describe (u :: r)}"
   | [] => .error s!"expected {repr t}, {describe []}"
 
-def parseIdent : List Token → Except String (Identifier × List Token)
-  | .Word s :: r => if validIdent s then .ok (s, r) else .error s!"{s} is not an identifier"
+/-- a declared name -/
+def parseName : List Token → Except String (Identifier × List Token)
+  | .Word s :: r => if validName s then .ok (s, r) else .error s!"{s} is not a name"
+  | ts => .error s!"expected a name, {describe ts}"
+
+/-- identifiers separated by commas, each satisfying `ok` -/
+def parseIdents (ok : String → Bool) : List Token → Except String (List Identifier × List Token)
+  | .Word s :: r =>
+    if ok s then match r with
+      | .Sym .Comma :: r => (parseIdents ok r).map fun (xs, r) => (s :: xs, r)
+      | _ => .ok ([s], r)
+    else .error s!"{s} is not an identifier"
   | ts => .error s!"expected an identifier, {describe ts}"
 
-/-- identifiers separated by commas -/
-def parseIdents : List Token → Except String (List Identifier × List Token)
+/-- identifiers separated by commas, maybe with a comma after the last (as in solc), and the `)`
+after them -/
+def parseParamList : List Token → Except String (List Identifier × List Token)
   | .Word s :: r =>
-    if validIdent s then match r with
-      | .Sym .Comma :: r => (parseIdents r).map fun (xs, r) => (s :: xs, r)
-      | _ => .ok ([s], r)
+    if validName s then match r with
+      | .Sym .Comma :: .Sym .RParen :: r => .ok ([s], r)
+      | .Sym .Comma :: r => (parseParamList r).map fun (xs, r) => (s :: xs, r)
+      | .Sym .RParen :: r => .ok ([s], r)
+      | ts => .error s!"expected , or ), {describe ts}"
     else .error s!"{s} is not an identifier"
   | ts => .error s!"expected an identifier, {describe ts}"
 
 /-- the parameters of a function after its `(`, and its `)` -/
 def parseParams : List Token → Except String (List Identifier × List Token)
   | .Sym .RParen :: r => .ok ([], r)
-  | ts => do
-    let (ps, r) ← parseIdents ts
-    return (ps, ← expect (.Sym .RParen) r)
+  | ts => parseParamList ts
+
+/-- an expression statement, which must be a call (as in solc) -/
+def exprStatement : Expression × List Token → Except String (Statement × List Token)
+  | (.FunctionCall f args, r) => .ok (.Expression (.FunctionCall f args), r)
+  | _ => .error "expected a call or an assignment"
 
 /-- the return variables of a function: none, or `->` and identifiers -/
 def parseRets : List Token → Except String (List Identifier × List Token)
-  | .Sym .Arrow :: r => parseIdents r
+  | .Sym .Arrow :: r => parseIdents validName r
   | ts => .ok ([], ts)
 
 mutual
@@ -115,14 +138,14 @@ def parseStatement : Nat → List Token → Except String (Statement × List Tok
     | .Sym .LBrace :: _ => (parseBlock n ts).map fun (b, r) => (.Block b, r)
     | .Word s :: r =>
       if s = "function" then do
-        let (f, r) ← parseIdent r
+        let (f, r) ← parseName r
         let r ← expect (.Sym .LParen) r
         let (ps, r) ← parseParams r
         let (rs, r) ← parseRets r
         let (b, r) ← parseBlock n r
         return (.FunctionDefinition f ps rs b, r)
       else if s = "let" then do
-        let (vs, r) ← parseIdents r
+        let (vs, r) ← parseIdents validName r
         match r with
         | .Sym .Assign :: r =>
           let (e, r) ← parseExpr n r
@@ -143,12 +166,12 @@ def parseStatement : Nat → List Token → Except String (Statement × List Tok
       else if s = "leave" then .ok (.Leave, r)
       else match r with
         | .Sym .Comma :: _ | .Sym .Assign :: _ => do
-          let (vs, r) ← parseIdents ts
+          let (vs, r) ← parseIdents validIdent ts
           let r ← expect (.Sym .Assign) r
           let (e, r) ← parseExpr n r
           return (.Assignment vs e, r)
-        | _ => (parseExpr n ts).map fun (e, r) => (.Expression e, r)
-    | _ => (parseExpr n ts).map fun (e, r) => (.Expression e, r)
+        | _ => (parseExpr n ts).bind exprStatement
+    | _ => (parseExpr n ts).bind exprStatement
 
 end
 
@@ -156,6 +179,15 @@ end
 def asciiName (bs : List UInt8) : Except String String :=
   if bs.all (· < 128) then .ok (String.ofList (bs.map fun b => Char.ofNat b.toNat))
   else .error "an object or data name must be ASCII"
+
+/-- the first error in the names of an object, as in solc: a name is empty, a child (an object or
+data in it) has the name of the object, or two children have one name -/
+def namesError (name : String) (objects : List Object) (data : List Data) : Option String :=
+  let children := objects.map (·.name) ++ data.map (·.name)
+  if name.isEmpty || children.any (·.isEmpty) then some "an object or data name cannot be empty"
+  else if children.contains name then some s!"a child of object {name} has its name"
+  else if !decide children.Nodup then some s!"two children of object {name} have one name"
+  else none
 
 mutual
 
@@ -165,7 +197,9 @@ def parseObject : Nat → List Token → Except String (Object × List Token)
     let name ← asciiName name
     let (code, r) ← parseBlock n r
     let ((objects, data), r) ← parseItems n r
-    return (⟨name, code, objects, data⟩, r)
+    match namesError name objects data with
+    | some e => .error e
+    | none => return (⟨name, code, objects, data⟩, r)
   | _ + 1, ts => .error s!"expected object \"name\" \{ code, {describe ts}"
 
 /-- the objects and data of an object after its code, and its `}` -/

@@ -6,6 +6,10 @@ import YulSemnaticsZoo.Yul.Syntax
 Text to tokens, for the grammar in the "Specification of Yul" and "Specification of Yul Object"
 sections of the solidity docs. The lexer also reads comments, `0x` numbers, `hex"…"` literals and
 the escapes `\\ \" \' \n \r \t \xNN \uNNNN` in strings.
+
+Where the grammar and solc 0.8.33 differ, it reads as solc: a backslash before a new line in a
+string is no character, a hex literal can have one `_` between two pairs of digits, and a
+decimal number does not start with `0`.
 -/
 
 namespace Yul
@@ -73,6 +77,9 @@ def lexString : List Char → Except String (List UInt8 × List Char)
     else if c = '\n' ∨ c = '\r' then .error "a new line in a string literal"
     else if c = '\\' then
       match cs with
+      -- a backslash before a new line is no character (as in solc)
+      | '\r' :: '\n' :: cs => lexString cs
+      | '\n' :: cs | '\r' :: cs => lexString cs
       | 'x' :: a :: b :: cs => match digitsValue 16 [a, b] with
         | some k => (lexString cs).map fun (bs, r) => (k.toUInt8 :: bs, r)
         | none => .error "\\x needs two hex digits"
@@ -90,13 +97,20 @@ def lexString : List Char → Except String (List UInt8 × List Char)
     else (lexString cs).map fun (bs, r) => (String.utf8EncodeChar c ++ bs, r)
 
 /-- the bytes of a hex literal after its opening quote `q`, and the characters after its
-closing quote -/
-def lexHex (q : Char) : List Char → Except String (List UInt8 × List Char)
-  | c :: cs => if c = q then .ok ([], cs) else match cs with
-    | d :: cs => match digitsValue 16 [c, d] with
-      | some k => (lexHex q cs).map fun (bs, r) => (k.toUInt8 :: bs, r)
-      | none => .error "a hex literal needs pairs of hex digits"
-    | [] => .error "a hex literal has no end"
+closing quote; `sep`: one `_` can come next, since a pair of digits is before it (as in solc) -/
+def lexHex (q : Char) (sep : Bool) : List Char → Except String (List UInt8 × List Char)
+  | c :: cs =>
+    if c = q then .ok ([], cs)
+    else if c = '_' ∧ sep then match cs with
+      | d :: _ =>
+        if d = q ∨ d = '_' then .error "a _ in a hex literal must be between two pairs of digits"
+        else lexHex q false cs
+      | [] => .error "a hex literal has no end"
+    else match cs with
+      | d :: cs => match digitsValue 16 [c, d] with
+        | some k => (lexHex q true cs).map fun (bs, r) => (k.toUInt8 :: bs, r)
+        | none => .error "a hex literal needs pairs of hex digits"
+      | [] => .error "a hex literal has no end"
   | [] => .error "a hex literal has no end"
 
 /-- `t` if the characters `r` after it do not continue it -/
@@ -111,7 +125,7 @@ def lexToken (c : Char) (cs : List Char) : Except String (Token × List Char) :=
     let (w, r) := span isIdentChar (c :: cs)
     match w, r with
     | ['h', 'e', 'x'], q :: r =>
-      if q = '"' ∨ q = '\'' then (lexHex q r).map fun (bs, r) => (.Str bs, r)
+      if q = '"' ∨ q = '\'' then (lexHex q false r).map fun (bs, r) => (.Str bs, r)
       else .ok (.Word "hex", q :: r)
     | w, r => .ok (.Word (String.ofList w), r)
   else if c.isDigit then
@@ -123,9 +137,11 @@ def lexToken (c : Char) (cs : List Char) : Except String (Token × List Char) :=
       | _, _ => .error "0x needs hex digits"
     | _, _ =>
       let (ds, r) := span Char.isDigit (c :: cs)
-      match digitsValue 10 ds with
-      | some k => ended (.Number k) r
-      | none => .error "a number needs digits"
+      match ds, digitsValue 10 ds with
+      | '0' :: _ :: _, _ =>
+        .error "a decimal number cannot start with 0 (octal numbers are not allowed)"
+      | _, some k => ended (.Number k) r
+      | _, none => .error "a number needs digits"
   else if c = '"' then (lexString cs).map fun (bs, r) => (.Str bs, r)
   else if c = '{' then .ok (.Sym .LBrace, cs)
   else if c = '}' then .ok (.Sym .RBrace, cs)

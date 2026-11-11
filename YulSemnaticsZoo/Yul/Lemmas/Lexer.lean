@@ -92,6 +92,38 @@ theorem digitsValue_decimal (n : Nat) : digitsValue 10 (decimal n) = some n := b
       simp [(digit_facts (n % 10) (by omega)).1, Nat.mod_lt n (by omega : 10 > 0)]
       omega
 
+theorem nonzero_digit : ∀ k, k < 10 → 1 ≤ k → Char.ofNat (48 + k) ≠ '0' := by decide
+
+theorem decimal_single {n : Nat} {c : Char} (h : decimal n = [c]) : n < 10 := by
+  rw [decimal] at h
+  split at h
+  · assumption
+  · obtain ⟨d, ds, hd⟩ := List.exists_cons_of_ne_nil (decimal_ne_nil (n / 10))
+    rw [hd] at h
+    simp at h
+
+/-- a printed decimal number of two or more digits does not start with `0` -/
+theorem decimal_head (n : Nat) : ∀ c d ds, decimal n = c :: d :: ds → c ≠ '0' := by
+  induction n using Nat.strongRecOn with
+  | _ n ih =>
+    intro c d ds h
+    rw [decimal] at h
+    split at h
+    · simp at h
+    · next hn =>
+      obtain ⟨c', cs', hd⟩ := List.exists_cons_of_ne_nil (decimal_ne_nil (n / 10))
+      rw [hd] at h
+      simp only [List.cons_append, List.cons.injEq] at h
+      obtain ⟨rfl, _⟩ := h
+      cases cs' with
+      | nil =>
+        have h10 := decimal_single hd
+        rw [decimal, ite_eq_left_iff.mpr (fun h => absurd h10 h)] at hd
+        simp only [List.cons.injEq, and_true] at hd
+        rw [← hd]
+        exact nonzero_digit (n / 10) h10 (by omega)
+      | cons d' ds' => exact ih (n / 10) (by omega) c' d' ds' hd
+
 theorem lexToken_number (n : Nat) (r : List Char) (hr : ∀ d ∈ r.head?, d ∈ stopChars) :
     ∃ c cs, decimal n = c :: cs ∧ isSpace c = false ∧ c ≠ '/' ∧
       lexToken c (cs ++ r) = .ok (.Number n, r) := by
@@ -109,6 +141,11 @@ theorem lexToken_number (n : Nat) (r : List Char) (hr : ∀ d ∈ r.head?, d ∈
     cases r with
     | nil => rfl
     | cons d r => simp [ended, (stopChars_facts d (hr d (by simp))).1]
+  have hnot : ∀ x xs, c :: cs ≠ '0' :: x :: xs := by
+    intro x xs h
+    simp only [List.cons.injEq] at h
+    obtain ⟨hc0, rfl⟩ := h
+    exact decimal_head n c x xs hdec hc0
   simp only [lexToken, hc.2.1, hc.1, Bool.false_eq_true, ite_false, ite_true]
   split
   · next cs' heq =>
@@ -121,7 +158,9 @@ theorem lexToken_number (n : Nat) (r : List Char) (hr : ∀ d ∈ r.head?, d ∈
     | cons d ds =>
       simp at heq
       exact (hd d (by simp)).2.2.2.2 heq.1
-  · simp only [← List.cons_append, hspan, hval, hended]
+  · -- a printed number does not start with `0` and another digit
+    simp only [← List.cons_append, hspan, hval]
+    exact hended
 
 theorem digitsValue_hexByte (b : UInt8) :
     digitsValue 16 [hexDigit (b.toNat / 16), hexDigit (b.toNat % 16)] = some b.toNat := by
@@ -203,10 +242,6 @@ theorem lexToken_chars (t : Token) (ht : t.lexable = true) (r : List Char) (hr :
     simp [lexToken, isIdentStart, lexString_escapes, Except.map]
   | Sym s => cases s <;> exact ⟨_, _, rfl, by decide, by decide, rfl⟩
 
-def tokens (ps : List Piece) : List Token :=
-  ps.filterMap fun p => match p with
-    | .tok t => some t
-    | .line _ => none
 
 theorem lexWith_spaces (k m : Nat) (x : List Char) :
     lexWith (m + k) (List.replicate k ' ' ++ x) = lexWith m x := by

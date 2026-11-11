@@ -10,6 +10,9 @@ it, gives the part and `r`, if the fuel is at least 3 for each token.
 
 namespace Yul
 
+theorem validName_ident {s : String} (h : validName s = true) : validIdent s = true := by
+  simp only [validName, Bool.and_eq_true] at h; exact h.1
+
 theorem validIdent_ne {s : String} (h : validIdent s = true) :
     s ≠ "function" ∧ s ≠ "let" ∧ s ≠ "if" ∧ s ≠ "for" ∧ s ≠ "break" ∧ s ≠ "continue" ∧
       s ≠ "leave" ∧ s ≠ "true" ∧ s ≠ "false" := by
@@ -24,9 +27,10 @@ theorem identsPieces_cons_cons (x y : Identifier) (ys : List Identifier) :
     identsPieces (x :: y :: ys) = word x :: sym .Comma :: identsPieces (y :: ys) := by
   simp [identsPieces]
 
-theorem parseIdents_pieces (xs : List Identifier) (hne : xs ≠ []) (hv : xs.all validIdent = true)
+theorem parseIdents_pieces (ok : String → Bool) (xs : List Identifier) (hne : xs ≠ [])
+    (hv : xs.all ok = true)
     (r : List Token) (hr : ∀ t ∈ r.head?, t ≠ .Sym .Comma) :
-    parseIdents (tokens (identsPieces xs) ++ r) = .ok (xs, r) := by
+    parseIdents ok (tokens (identsPieces xs) ++ r) = .ok (xs, r) := by
   induction xs with
   | nil => contradiction
   | cons x xs ih =>
@@ -46,21 +50,45 @@ theorem parseIdents_pieces (xs : List Identifier) (hne : xs ≠ []) (hv : xs.all
       rw [parseIdents.eq_def]
       simp [hv.1, ih (by simp) hv.2, Except.map]
 
-theorem parseParams_pieces (ps : List Identifier) (hv : ps.all validIdent = true)
+theorem parseParamList_pieces (xs : List Identifier) (hne : xs ≠ [])
+    (hv : xs.all validName = true) (r : List Token) :
+    parseParamList (tokens (identsPieces xs) ++ .Sym .RParen :: r) = .ok (xs, r) := by
+  induction xs with
+  | nil => contradiction
+  | cons x xs ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at hv
+    cases xs with
+    | nil =>
+      simp only [identsPieces, List.flatMap_nil, tokens_tok, tokens_nil, List.cons_append,
+        List.nil_append, word_eq]
+      rw [parseParamList.eq_def]
+      simp [hv.1]
+    | cons y ys =>
+      rw [identsPieces_cons_cons]
+      simp only [tokens_tok, word_eq, sym_eq, List.cons_append]
+      have hy : tokens (identsPieces (y :: ys)) =
+          .Word y :: tokens (ys.flatMap fun x => [sym .Comma, word x]) := rfl
+      rw [parseParamList.eq_def]
+      simp only [hv.1, ite_true]
+      rw [hy] at ih ⊢
+      have h := ih (by simp) hv.2
+      simp only [sym_eq, word_eq, List.cons_append] at h
+      simp [h, Except.map]
+
+theorem parseParams_pieces (ps : List Identifier) (hv : ps.all validName = true)
     (r : List Token) :
     parseParams (tokens (identsPieces ps) ++ .Sym .RParen :: r) = .ok (ps, r) := by
   cases ps with
   | nil => rfl
   | cons p ps =>
-    have h := parseIdents_pieces (p :: ps) (by simp) hv (.Sym .RParen :: r) (by simp)
     have hhead : tokens (identsPieces (p :: ps)) =
         .Word p :: tokens (ps.flatMap fun x => [sym .Comma, word x]) := rfl
+    have h := parseParamList_pieces (p :: ps) (by simp) hv r
+    rw [hhead] at h ⊢
     rw [parseParams.eq_def]
-    split
-    · next r' heq => rw [hhead] at heq; simp at heq
-    · simp [h, bind, Except.bind, expect, pure, Except.pure]
+    simpa using h
 
-theorem parseRets_pieces (rs : List Identifier) (hv : rs.all validIdent = true) (r : List Token) :
+theorem parseRets_pieces (rs : List Identifier) (hv : rs.all validName = true) (r : List Token) :
     parseRets (tokens (if rs.isEmpty then [] else sym .Arrow :: identsPieces rs) ++
       .Sym .LBrace :: r) = .ok (rs, .Sym .LBrace :: r) := by
   cases rs with
@@ -69,7 +97,7 @@ theorem parseRets_pieces (rs : List Identifier) (hv : rs.all validIdent = true) 
     simp only [List.isEmpty_cons, Bool.false_eq_true, ite_false, sym_eq, tokens_tok,
       List.cons_append]
     rw [parseRets.eq_def]
-    exact parseIdents_pieces (x :: xs) (by simp) hv _ (by simp)
+    exact parseIdents_pieces validName (x :: xs) (by simp) hv _ (by simp)
 
 /-- the first printed token of an expression is not a symbol -/
 theorem expr_head (e : Expression) : ∃ t ts, tokens e.pieces = t :: ts ∧ ∀ s, t ≠ .Sym s := by
@@ -272,7 +300,7 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
     rw [parseStatement.eq_def]
     simp only [List.cons_append, ite_true]
     bind_simp
-    simp only [parseIdent, hf, ite_true, expect, parseParams_pieces ps hps]
+    simp only [parseName, hf, ite_true, expect, parseParams_pieces ps hps]
     simp only [sym_eq] at hrets
     rw [hrets]
     simp only
@@ -290,7 +318,7 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
       obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
       rw [parseStatement.eq_def]
       simp only [ite_true, show ("let" = "function") = False by decide, ite_false]
-      rw [parseIdents_pieces vs hne hvs _ (by simp)]
+      rw [parseIdents_pieces validName vs hne hvs _ (by simp)]
       bind_simp
       rw [parseExpr_pieces e he r (expr_follow_of_stmt hr) m (by omega)]
     | none =>
@@ -299,7 +327,7 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
       obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
       rw [parseStatement.eq_def]
       simp only [ite_true, show ("let" = "function") = False by decide, ite_false]
-      rw [parseIdents_pieces vs hne hvs r (fun t ht => (hr t ht).2.1)]
+      rw [parseIdents_pieces validName vs hne hvs r (fun t ht => (hr t ht).2.1)]
       bind_simp
       split
       · simp [stmtFollow] at hr
@@ -310,13 +338,14 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
     obtain ⟨⟨hne, hvs⟩, he⟩ := hv
     obtain ⟨x, xs, rfl⟩ := List.exists_cons_of_ne_nil hne
     have hx := validIdent_ne (by simpa using (List.all_eq_true.mp hvs) x (by simp))
-    have hids := parseIdents_pieces (x :: xs) hne hvs (.Sym .Assign :: (tokens e.pieces ++ r))
+    have hids :=
+      parseIdents_pieces validIdent (x :: xs) hne hvs (.Sym .Assign :: (tokens e.pieces ++ r))
       (by simp)
     simp only [Statement.pieces, sym_eq, tokens_tok, tokens_append, List.cons_append,
       List.append_assoc, List.length_cons, List.length_append] at hn ⊢
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     have hrest : ∀ r', parseExpr m (tokens e.pieces ++ r) = r' →
-        (do let (vs, r) ← parseIdents (tokens (identsPieces (x :: xs)) ++ .Sym .Assign ::
+        (do let (vs, r) ← parseIdents validIdent (tokens (identsPieces (x :: xs)) ++ .Sym .Assign ::
               (tokens e.pieces ++ r))
             let r ← expect (.Sym .Assign) r
             let (e, r) ← parseExpr m r
@@ -350,7 +379,8 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
     bind_simp
     rw [parseBlock_pieces b hv.2 k r m (by omega)]
   | .Expression e, hv, k, r, hr, n, hn => by
-    simp only [Statement.valid] at hv
+    simp only [Statement.valid, Bool.and_eq_true] at hv
+    obtain ⟨hcall, hv⟩ := hv
     simp only [Statement.pieces] at hn ⊢
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     have he := parseExpr_pieces e hv r (expr_follow_of_stmt hr) m (by omega)
@@ -363,38 +393,7 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
         List.cons_append] at he ⊢
       simp only [hf, ite_false]
       rw [he]; rfl
-    | Identifier x =>
-      simp only [Expression.valid] at hv
-      have hx := validIdent_ne hv
-      simp only [Expression.pieces, word_eq, tokens_tok, tokens_nil, List.cons_append,
-        List.nil_append] at he ⊢
-      simp only [hx, ite_false]
-      split
-      · simp [stmtFollow] at hr
-      · simp [stmtFollow] at hr
-      · rw [he]; rfl
-    | Literal l =>
-      cases l with
-      | NumberLiteral _ | StringLiteral _ =>
-        simp only [Expression.pieces, Literal.token, tokens_tok, tokens_nil, List.cons_append,
-          List.nil_append] at he ⊢
-        rw [he]; rfl
-      | TrueLiteral | FalseLiteral =>
-        simp only [Expression.pieces, Literal.token, tokens_tok, tokens_nil, List.cons_append,
-          List.nil_append] at he ⊢
-        simp only [ite_false, show ("true" = "function") = False by decide,
-          show ("true" = "let") = False by decide, show ("true" = "if") = False by decide,
-          show ("true" = "for") = False by decide, show ("true" = "break") = False by decide,
-          show ("true" = "continue") = False by decide, show ("true" = "leave") = False by decide,
-          show ("false" = "function") = False by decide, show ("false" = "let") = False by decide,
-          show ("false" = "if") = False by decide, show ("false" = "for") = False by decide,
-          show ("false" = "break") = False by decide,
-          show ("false" = "continue") = False by decide,
-          show ("false" = "leave") = False by decide]
-        split
-        · simp [stmtFollow] at hr
-        · simp [stmtFollow] at hr
-        · rw [he]; rfl
+    | Identifier _ | Literal _ => simp at hcall
   | .ForLoop i c p b, hv, k, r, _, n, hn => by
     simp only [Statement.valid, Bool.and_eq_true] at hv
     obtain ⟨⟨⟨hi, hc⟩, hp⟩, hb⟩ := hv
@@ -469,7 +468,7 @@ theorem parseObject_pieces : ∀ (o : Object), o.valid = true → ∀ (k : Nat) 
     3 * (tokens (o.pieces k)).length ≤ n → parseObject n (tokens (o.pieces k) ++ r) = .ok (o, r)
   | ⟨name, code, objects, data⟩, hv, k, r, n, hn => by
     simp only [Object.valid, Bool.and_eq_true] at hv
-    obtain ⟨⟨⟨hname, hcode⟩, hobjects⟩, hdata⟩ := hv
+    obtain ⟨⟨⟨⟨hname, hcode⟩, hobjects⟩, hdata⟩, hnames⟩ := hv
     simp only [Object.pieces, word_eq, sym_eq, tokens_tok, tokens_line, tokens_append,
       tokens_nil, List.cons_append, List.append_assoc, List.nil_append, List.length_cons,
       List.length_append, List.length_nil] at hn ⊢
@@ -480,6 +479,8 @@ theorem parseObject_pieces : ∀ (o : Object), o.valid = true → ∀ (k : Nat) 
     rw [parseBlock_pieces code hcode (k + 2) _ m (by omega)]
     simp only
     rw [← List.append_assoc, parseItems_pieces objects hobjects data hdata (k + 2) r m (by omega)]
+    simp only [Option.isNone_iff_eq_none] at hnames
+    simp only [hnames]
 
 theorem parseItems_pieces : ∀ (os : List Object), objectsValid os = true →
     ∀ (ds : List Data), ds.all (isAscii ·.name) = true → ∀ (k : Nat) (r : List Token) n,

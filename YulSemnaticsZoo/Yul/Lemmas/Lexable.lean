@@ -13,6 +13,14 @@ namespace Yul
 theorem validIdent_word {s : String} (h : validIdent s = true) : isWord s = true := by
   simp only [validIdent, Bool.and_eq_true] at h; exact h.1
 
+theorem validName_word {s : String} (h : validName s = true) : isWord s = true := by
+  simp only [validName, validIdent, Bool.and_eq_true] at h; exact h.1.1
+
+theorem all_validName {xs : List Identifier} (h : xs.all validName = true) :
+    xs.all validIdent = true := by
+  simp only [List.all_eq_true, validName, Bool.and_eq_true] at h ⊢
+  exact fun x hx => (h x hx).1
+
 @[simp] theorem lexable_word (s : String) : (Token.Word s).lexable = isWord s := rfl
 @[simp] theorem lexable_number (n : Nat) : (Token.Number n).lexable = true := rfl
 @[simp] theorem lexable_str (bs : List UInt8) : (Token.Str bs).lexable = true := rfl
@@ -71,12 +79,12 @@ theorem moreArgs_lexable : ∀ (es : List Expression), argsValid es = true →
 
 end
 
-theorem rets_lexable (rs : List Identifier) (h : rs.all validIdent = true) :
+theorem rets_lexable (rs : List Identifier) (h : rs.all validName = true) :
     (tokens (if rs.isEmpty then [] else sym .Arrow :: identsPieces rs)).all Token.lexable =
       true := by
   split
   · rfl
-  · lexable_simp [idents_lexable rs h]
+  · lexable_simp [idents_lexable rs (all_validName h)]
 
 mutual
 
@@ -104,7 +112,7 @@ theorem stmt_lexable : ∀ (s : Statement), s.valid = true → ∀ k,
     obtain ⟨⟨⟨hf, hps⟩, hrs⟩, hb⟩ := hv
     have hr := rets_lexable rs hrs
     simp only [sym_eq] at hr
-    lexable_simp [Statement.pieces, validIdent_word hf, idents_lexable ps hps, hr,
+    lexable_simp [Statement.pieces, validName_word hf, idents_lexable ps (all_validName hps), hr,
       block_lexable b hb k]
   | .VariableDeclaration vs v, hv, k => by
     simp only [Statement.valid, Bool.and_eq_true] at hv
@@ -112,8 +120,8 @@ theorem stmt_lexable : ∀ (s : Statement), s.valid = true → ∀ k,
     cases v with
     | some e =>
       simp only at he
-      lexable_simp [Statement.pieces, idents_lexable vs hvs, expr_lexable e he]
-    | none => lexable_simp [Statement.pieces, idents_lexable vs hvs]
+      lexable_simp [Statement.pieces, idents_lexable vs (all_validName hvs), expr_lexable e he]
+    | none => lexable_simp [Statement.pieces, idents_lexable vs (all_validName hvs)]
   | .Assignment vs e, hv, k => by
     simp only [Statement.valid, Bool.and_eq_true] at hv
     lexable_simp [Statement.pieces, idents_lexable vs hv.1.2, expr_lexable e hv.2]
@@ -121,8 +129,8 @@ theorem stmt_lexable : ∀ (s : Statement), s.valid = true → ∀ k,
     simp only [Statement.valid, Bool.and_eq_true] at hv
     lexable_simp [Statement.pieces, expr_lexable c hv.1, block_lexable b hv.2 k]
   | .Expression e, hv, k => by
-    simp only [Statement.valid] at hv
-    lexable_simp [Statement.pieces, expr_lexable e hv]
+    simp only [Statement.valid, Bool.and_eq_true] at hv
+    lexable_simp [Statement.pieces, expr_lexable e hv.2]
   | .ForLoop i c p b, hv, k => by
     simp only [Statement.valid, Bool.and_eq_true] at hv
     obtain ⟨⟨⟨hi, hc⟩, hp⟩, hb⟩ := hv
@@ -146,8 +154,8 @@ theorem object_lexable : ∀ (o : Object), o.valid = true → ∀ k,
     (tokens (o.pieces k)).all Token.lexable = true
   | ⟨name, code, objects, data⟩, hv, k => by
     simp only [Object.valid, Bool.and_eq_true] at hv
-    lexable_simp [Object.pieces, block_lexable code hv.1.1.2 (k + 2),
-      objects_lexable objects hv.1.2 (k + 2), data_lexable data (k + 2)]
+    lexable_simp [Object.pieces, block_lexable code hv.1.1.1.2 (k + 2),
+      objects_lexable objects hv.1.1.2 (k + 2), data_lexable data (k + 2)]
 
 theorem objects_lexable : ∀ (os : List Object), objectsValid os = true → ∀ k,
     (tokens (objectsPieces k os)).all Token.lexable = true
