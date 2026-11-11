@@ -1,0 +1,10 @@
+name = "yul-semnatics-zoo"
+version = "0.1.0"
+defaultTargets = ["yul-semnatics-zoo"]
+
+[[lean_lib]]
+name = "YulSemnaticsZoo"
+
+[[lean_exe]]
+name = "yul-semnatics-zoo"
+root = "Main"
