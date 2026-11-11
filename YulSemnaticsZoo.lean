@@ -1,6 +1,12 @@
 import YulSemnaticsZoo.Yul.Syntax
 import YulSemnaticsZoo.Yul.Dialect
 import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.Yul.Lexer
+import YulSemnaticsZoo.Yul.Printer
+import YulSemnaticsZoo.Yul.Parser
+import YulSemnaticsZoo.Yul.Quote
+import YulSemnaticsZoo.Yul.Valid
+import YulSemnaticsZoo.Yul.Theorems
 import YulSemnaticsZoo.EVM.Syntax
 import YulSemnaticsZoo.EVM.Printer
 import YulSemnaticsZoo.EVM.Theorems
