@@ -1,3 +1,4 @@
+import Fuzz.Gen
 import Fuzz.Solc
 
 /-!
@@ -9,14 +10,6 @@ them against `solc` (see `Fuzz.Solc`). `solc` must be on the path.
 
 namespace Fuzz
 open EVM Instr
-
-abbrev Gen := StateM StdGen
-
-def nat (lo hi : Nat) : Gen Nat := modifyGet fun g => randNat g lo hi
-
-def byte : Gen UInt8 := return (← nat 0 255).toUInt8
-
-def list (k : Nat) (x : Gen α) : Gen (List α) := (List.range k).mapM fun _ => x
 
 /-- a random byte that is not in `eofImmediate` -/
 def dataByte : Gen UInt8 := do
