@@ -18,8 +18,9 @@ set_option doc.verso true
   gives the builtins; the *EVM dialect* has the builtins of the small EVM and the builtins of
   solc for objects.
 - *Lexer*, *Printer* and *Parser*: between text and ASTs. Where the grammar in the docs and solc
-  0.8.38 differ, the parser follows solc, but it rejects object names that are not UTF-8.
-  {lit}`lake test` fuzzes the parser against the parser of solc.
+  0.8.38 differ, the parser follows solc, but it rejects object names that are not UTF-8 (the
+  *Parser* page lists the differences). {lit}`lake test` fuzzes the parser against the parser
+  of solc.
 - *Valid* and *Theorems*: parsing printed text gives the AST, for each AST that the grammar can
   express.
 - *WellFormed*: the restrictions on the grammar and the scoping rules, for a dialect. The

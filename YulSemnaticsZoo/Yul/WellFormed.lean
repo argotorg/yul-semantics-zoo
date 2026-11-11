@@ -18,10 +18,22 @@ The restrictions on ASTs that the grammar does not express, for a dialect:
 * each literal fits in a word: a number is less than 2^256, and a string has at most 32 bytes
   (but a literal argument of a builtin can be longer).
 
-Where the docs and solc 0.8.38 differ, these are as in solc, but no function is anywhere in an
-init block, as in the docs. A declaration cannot use the name of a builtin or a name that the
-dialect reserves. The names that {lit}`datasize` and {lit}`dataoffset` can refer to are as in
-{lit}`Object::Structure` of solc.
+## The docs and solc
+
+Where the docs and solc 0.8.38 differ, these follow solc, but for functions in init blocks:
+
+* A function in the body or post block of a loop in an init block: the docs reject it; solc
+  accepts it ([#17211](https://github.com/argotorg/solidity/issues/17211)). Here: rejected, as
+  the docs.
+* A declared name that is the name of a builtin, an EVM instruction ({lit}`jump`, {lit}`dup1`, …)
+  or an object builtin: the docs reserve only the names that start with {lit}`verbatim`; solc
+  rejects them. Here: as solc, with the names that the dialect reserves.
+* A {lit}`verbatim` call with no code: the docs have no rule; solc rejects it. Here: as solc (in
+  the EVM dialect).
+* {lit}`datasize("B.D")` for data {lit}`D` in a sub-object {lit}`B`: the docs say that {lit}`.`
+  separates the objects in an object; the analysis of solc accepts it, and then the assembly
+  fails ([#9470](https://github.com/argotorg/solidity/issues/9470)). Here: accepted, as the
+  {lit}`Object::Structure` of solc.
 
 {lit}`lake test` fuzzes {lit}`Object.WellFormed` against the analysis of solc, and skips the
 functions in init blocks that solc accepts.

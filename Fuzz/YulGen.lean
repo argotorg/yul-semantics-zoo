@@ -204,6 +204,7 @@ partial def object (d : Nat) : YGen Object := do
     return ({ name := ← objectName "D", value := ← list (← nat 0 8) byte } : Data)
   let o : Object := { name, code := ⟨[]⟩, objects, data }
   -- not the data of a sub-object: solc analyses `datasize("O.D")`, but it fails to assemble it
+  -- (solidity issue 9470)
   return { o with code := ← block { paths := o.dataNames.filter (!(subData o).contains ·) } true 3 }
 
 

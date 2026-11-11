@@ -13,9 +13,32 @@ enough fuel.
 After a word, the next token tells the statement: {lit}`(` starts a function call, {lit}`,` or
 {lit}`:=` an assignment.
 
-Where the grammar and solc 0.8.38 differ, it parses as solc: only a call is an expression
-statement, a declared name does not end with {lit}`.` and has no {lit}`..`, and function parameters
-can end with a comma. But an object or data name must be UTF-8, since it is a {name}`String`.
+## The docs and solc
+
+The docs give a grammar, but also say that Yul parses comments, literals and identifiers as
+Solidity does; for literals the two do not agree. Where the docs and solc 0.8.38 differ, the lexer
+and the parser follow solc, but for names that are not UTF-8:
+
+* An expression statement: the grammar accepts any expression (one with values is then not
+  well-formed); solc accepts only a call. Here: as solc.
+* A decimal number with a leading zero ({lit}`024`): the grammar accepts it, Solidity rejects it;
+  solc rejects it. Here: as solc.
+* A {lit}`_` between two pairs of hex digits ({lit}`hex"00_11"`): the grammar rejects it,
+  Solidity accepts it; solc accepts it. Here: as solc.
+* A {lit}`_` in a number ({lit}`1_000`): the grammar rejects it, Solidity accepts it; solc rejects
+  it. Here: as solc.
+* A backslash before a new line in a string: the grammar is not clear, in Solidity it is no
+  character; in solc it is no character. Here: as solc.
+* A declared name that ends with {lit}`.` or has {lit}`..`: the grammar accepts it; solc rejects
+  it ([#7646](https://github.com/argotorg/solidity/issues/7646)). Here: as solc.
+* A comma after the last function parameter ({lit}`function f(a,)`): the grammar rejects it; solc
+  accepts it ([#17114](https://github.com/argotorg/solidity/issues/17114)). Here: as solc.
+* An object or data name that is empty, the name of its object, or the name of another child: the
+  grammar accepts it; solc rejects it. Here: as solc.
+* An object or data name that is not UTF-8: the grammar accepts it; solc accepts it, and then
+  fails to write its JSON output. Here: rejected, since a name is a {name}`String`.
+
+{lit}`lake test` fuzzes the parser against solc, and skips the names that are not UTF-8.
 -/
 
 namespace Yul
