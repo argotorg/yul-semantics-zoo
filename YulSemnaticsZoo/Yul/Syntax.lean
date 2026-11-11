@@ -21,7 +21,7 @@ abbrev Identifier := String
 
 inductive Literal where
   | NumberLiteral (n : Nat)
-  /-- the bytes of the string, after escapes; also a `hex"…"` literal -/
+  /-- `StringLiteral`: the bytes of the string, after escapes; also a `hex"…"` literal -/
   | StringLiteral (bytes : List UInt8)
   | TrueLiteral
   | FalseLiteral
@@ -39,14 +39,14 @@ inductive Block where
 
 inductive Statement where
   | Block (b : Block)
-  /-- `function name(params) -> rets body` -/
+  /-- `FunctionDefinition`: `function name(params) -> rets body` -/
   | FunctionDefinition (name : Identifier) (params rets : List Identifier) (body : Block)
-  /-- `let vars := val`, or `let vars` -/
+  /-- `VariableDeclaration`: `let vars := val`, or `let vars` -/
   | VariableDeclaration (vars : List Identifier) (val : Option Expression)
   | Assignment (vars : List Identifier) (val : Expression)
   | If (cond : Expression) (body : Block)
   | Expression (e : Expression)
-  /-- `for init cond post body` -/
+  /-- `ForLoop`: `for init cond post body` -/
   | ForLoop (init : Block) (cond : Expression) (post body : Block)
   | Break
   | Continue

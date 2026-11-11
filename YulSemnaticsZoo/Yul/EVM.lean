@@ -17,28 +17,28 @@ inductive Builtin where
   | Mload
   | Mstore
   | Gas
-  /-- `create(value, offset, size)` -/
+  /-- `Create`: `create(value, offset, size)` -/
   | Create
-  /-- `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  /-- `Call`: `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
   | Call
-  /-- `return(offset, size)` -/
+  /-- `Return`: `return(offset, size)` -/
   | Return
-  /-- `dataoffset("name")`: the offset of a sub-object or data in the code -/
+  /-- `Dataoffset`: `dataoffset("name")`: the offset of a sub-object or data in the code -/
   | Dataoffset (name : String)
-  /-- `datasize("name")`: the size of a sub-object or data -/
+  /-- `Datasize`: `datasize("name")`: the size of a sub-object or data -/
   | Datasize (name : String)
-  /-- `datacopy(to, offset, size)` -/
+  /-- `Datacopy`: `datacopy(to, offset, size)` -/
   | Datacopy
-  /-- `setimmutable(offset, "name", value)`: write `value` to memory at `offset` at each
-  place where the runtime code at `offset` reads immutable `name` -/
+  /-- `Setimmutable`: `setimmutable(offset, "name", value)`: write `value` to memory at
+  `offset` at each place where the runtime code at `offset` reads immutable `name` -/
   | Setimmutable (name : String)
-  /-- `loadimmutable("name")` -/
+  /-- `Loadimmutable`: `loadimmutable("name")` -/
   | Loadimmutable (name : String)
-  /-- `linkersymbol("id")`: the address of library `id`, set by the linker -/
+  /-- `Linkersymbol`: `linkersymbol("id")`: the address of library `id`, set by the linker -/
   | Linkersymbol (id : String)
-  /-- `memoryguard(size)` -/
+  /-- `Memoryguard`: `memoryguard(size)` -/
   | Memoryguard (size : BitVec 256)
-  /-- `verbatim_<ins>i_<outs>o("code", args)`: the bytes `code` in the output -/
+  /-- `Verbatim`: `verbatim_<ins>i_<outs>o("code", args)`: the bytes `code` in the output -/
   | Verbatim (ins outs : Nat) (code : List UInt8)
   deriving DecidableEq, Repr
 

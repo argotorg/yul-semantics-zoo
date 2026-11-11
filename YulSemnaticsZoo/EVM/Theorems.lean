@@ -1,7 +1,7 @@
 import YulSemnaticsZoo.EVM.Lemmas.Encode
 
 /-!
-# Tiny EVM: theorems
+# EVM: theorems
 
 Decoding an encoded instruction or program gives it back, and encoding a decoded instruction
 gives back the bytes.

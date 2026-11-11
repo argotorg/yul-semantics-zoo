@@ -1,0 +1,86 @@
+# The literate document: `lake query :literateHtml` builds it, and the GitHub workflow
+# verso-literate-pages.yml publishes it.
+
+landing_page = "YulSemnaticsZoo"
+
+# the lemmas are long proof scripts; the theorems that they prove are in the Theorems modules
+exclude = ["YulSemnaticsZoo.Yul.Lemmas", "YulSemnaticsZoo.EVM.Lemmas"]
+
+hide_commands = ["import", "open", "namespace", "end"]
+
+# the reading order; `order` applies to each level (`order_children` with keys like
+# "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0)
+order = [
+  "YulSemnaticsZoo.Yul",
+  "YulSemnaticsZoo.EVM",
+  "YulSemnaticsZoo.Yul.Syntax",
+  "YulSemnaticsZoo.Yul.Dialect",
+  "YulSemnaticsZoo.Yul.EVM",
+  "YulSemnaticsZoo.Yul.Lexer",
+  "YulSemnaticsZoo.Yul.Printer",
+  "YulSemnaticsZoo.Yul.Parser",
+  "YulSemnaticsZoo.Yul.Valid",
+  "YulSemnaticsZoo.Yul.Theorems",
+  "YulSemnaticsZoo.Yul.Quote",
+  "YulSemnaticsZoo.EVM.Syntax",
+  "YulSemnaticsZoo.EVM.Printer",
+  "YulSemnaticsZoo.EVM.Theorems",
+]
+
+# docstrings are prose: show them as text between the code boxes
+docstrings_as_text = true
+
+# colours of code: Jellybeans in dark mode, Solarized in light mode
+extra_css = ["doc/code-colours.css"]
+
+[[targets]]
+library = "YulSemnaticsZoo"
+
+[metadata]
+title = "Yul semantics zoo"
+description = "A small Yul and a small EVM, and semantics for them in different styles"
+
+[modules."YulSemnaticsZoo.Yul"]
+title = "Yul"
+
+[modules."YulSemnaticsZoo.EVM"]
+title = "EVM"
+
+[modules."YulSemnaticsZoo"]
+title = "Introduction"
+
+[modules."YulSemnaticsZoo.Yul.Syntax"]
+title = "Yul: syntax"
+
+[modules."YulSemnaticsZoo.Yul.Dialect"]
+title = "Yul: dialects"
+
+[modules."YulSemnaticsZoo.Yul.EVM"]
+title = "Yul: the EVM dialect"
+
+[modules."YulSemnaticsZoo.Yul.Lexer"]
+title = "Yul: lexer"
+
+[modules."YulSemnaticsZoo.Yul.Printer"]
+title = "Yul: printer"
+
+[modules."YulSemnaticsZoo.Yul.Parser"]
+title = "Yul: parser"
+
+[modules."YulSemnaticsZoo.Yul.Valid"]
+title = "Yul: valid ASTs"
+
+[modules."YulSemnaticsZoo.Yul.Theorems"]
+title = "Yul: theorems"
+
+[modules."YulSemnaticsZoo.Yul.Quote"]
+title = "Yul: quasiquoter"
+
+[modules."YulSemnaticsZoo.EVM.Syntax"]
+title = "EVM: syntax"
+
+[modules."YulSemnaticsZoo.EVM.Printer"]
+title = "EVM: printer"
+
+[modules."YulSemnaticsZoo.EVM.Theorems"]
+title = "EVM: theorems"

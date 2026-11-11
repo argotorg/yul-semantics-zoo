@@ -1,5 +1,5 @@
 /-!
-# Tiny EVM: syntax
+# EVM: syntax
 
 EVM code is a list of bytes. Code can read code (`CODECOPY`, `EXTCODECOPY`) and create
 code (`CREATE`), so programs are bytes, not `Instr`s. `Instr` is an instruction decoded from
@@ -26,17 +26,17 @@ inductive Instr where
   | Jumpi
   | Gas
   | Jumpdest
-  /-- `PUSHn`, with its immediate of `n` bytes in big-endian order -/
+  /-- `Push`: `PUSHn`, with its immediate of `n` bytes in big-endian order -/
   | Push (n : Fin 33) (imm : Vector UInt8 n)
-  /-- `DUPn` -/
+  /-- `Dup`: `DUPn` -/
   | Dup (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- `SWAPn` -/
+  /-- `Swap`: `SWAPn` -/
   | Swap (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- `CREATE(value, offset, size)` -/
+  /-- `Create`: `CREATE(value, offset, size)` -/
   | Create
-  /-- `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  /-- `Call`: `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
   | Call
-  /-- `RETURN(offset, size)` -/
+  /-- `Return`: `RETURN(offset, size)` -/
   | Return
   deriving DecidableEq, Repr
 
@@ -113,7 +113,7 @@ def decode (b : UInt8) (rest : List UInt8) : Option (Instr × List UInt8) :=
 def disassemble (bytes : List UInt8) : List (Option Instr) :=
   go bytes.length bytes
 where
-  /-- each step takes at least one byte, so `bytes.length` steps take all bytes -/
+  /-- `disassemble.go`: each step takes at least one byte, so `bytes.length` steps take all bytes -/
   go : Nat → List UInt8 → List (Option Instr)
     | 0, _ | _, [] => []
     | k + 1, b :: rest =>

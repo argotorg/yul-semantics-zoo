@@ -1,7 +1,7 @@
 import YulSemnaticsZoo.EVM.Syntax
 
 /-!
-# Tiny EVM: lemmas about encoding and decoding
+# EVM: lemmas about encoding and decoding
 -/
 
 namespace EVM

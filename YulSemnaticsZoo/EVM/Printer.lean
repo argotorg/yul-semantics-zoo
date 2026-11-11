@@ -1,7 +1,7 @@
 import YulSemnaticsZoo.EVM.Syntax
 
 /-!
-# Tiny EVM: printer
+# EVM: printer
 
 Text for bytes and instructions. An instruction prints as in `solc --opcodes`.
 -/

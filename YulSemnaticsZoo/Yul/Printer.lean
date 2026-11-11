@@ -38,7 +38,7 @@ def Token.chars : Token → List Char
 
 inductive Piece where
   | tok (t : Token)
-  /-- a new line, then `k` spaces -/
+  /-- `line k`: a new line, then `k` spaces -/
   | line (k : Nat)
 
 /-- a space between the tokens `t` and `u`: not after `(`, and not before `(`, `)` or `,` -/

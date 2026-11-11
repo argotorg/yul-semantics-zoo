@@ -1,0 +1,39 @@
+/* Colours of Lean code in the literate document: Jellybeans (jellybeans.vim) in dark mode and
+   Solarized (NeoSolarized) in light mode.
+
+   Verso v4.35.0 sets the colour of code to black in both modes, its dark theme changes only the
+   background of code boxes, and it has colours only for keywords, constants and variables, not
+   for literals and punctuation. */
+
+:root {
+  --verso-code-box-background-color: #fdf6e3;
+  --verso-code-box-border-color: #eee8d5;
+  --verso-code-color: #657b83;
+  --verso-code-keyword-color: #859900;
+  --verso-code-const-color: #268bd2;
+  --verso-code-var-color: #6c71c4;
+  --code-string-color: #2aa198;
+  --code-number-color: #2aa198;
+  --code-delim-color: #93a1a1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --verso-code-box-background-color: #151515;
+    --verso-code-box-border-color: #2a2a2a;
+    --verso-code-color: #e8e8d3;
+    --verso-code-keyword-color: #8197bf;
+    --verso-code-const-color: #fad07a;
+    --verso-code-var-color: #c6b6ee;
+    --verso-selected-color: #404040;
+    --verso-tactic-state-color: #e8e8d3;
+    --verso-tactic-state-bg-color: #151515;
+    --code-string-color: #99ad6a;
+    --code-number-color: #cf6a4c;
+    --code-delim-color: #668799;
+  }
+}
+
+.hl.lean .token.literal.string { color: var(--code-string-color); }
+.hl.lean .token.literal.number, .hl.lean .token.literal.char { color: var(--code-number-color); }
+.hl.lean .token.punctuation, .hl.lean .token.delim { color: var(--code-delim-color); }

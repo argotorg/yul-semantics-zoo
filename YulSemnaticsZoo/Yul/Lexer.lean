@@ -20,17 +20,17 @@ inductive Symbol where
   | LParen
   | RParen
   | Comma
-  /-- `:=` -/
+  /-- `Assign`: `:=` -/
   | Assign
-  /-- `->` -/
+  /-- `Arrow`: `->` -/
   | Arrow
   deriving DecidableEq, Repr
 
 inductive Token where
-  /-- an identifier or a keyword -/
+  /-- `Word`: an identifier or a keyword -/
   | Word (s : String)
   | Number (n : Nat)
-  /-- a string literal or a hex literal: its bytes -/
+  /-- `Str`: a string literal or a hex literal: its bytes -/
   | Str (bytes : List UInt8)
   | Sym (s : Symbol)
   deriving DecidableEq, Repr
