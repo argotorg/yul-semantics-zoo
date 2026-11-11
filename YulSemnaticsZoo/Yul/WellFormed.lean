@@ -12,29 +12,22 @@ and [Scoping Rules](https://docs.soliditylang.org/en/v0.8.38/yul.html#scoping-ru
 The restrictions on ASTs that the grammar does not express, for a dialect:
 * each name is in scope where it is used, and each declaration declares new names;
 * each expression has the number of values that its place needs;
-* {lit}`break` and {lit}`continue` are in the body of a loop, {lit}`leave` is in a function, and
-  there is no function in the init block of a loop;
+* {lit}`break` and {lit}`continue` are in the body of the innermost loop, {lit}`leave` is in a
+  function, and no function is anywhere in the init block of a loop;
 * the arguments and literal arguments of each builtin are as the dialect needs;
 * each literal fits in a word: a number is less than 2^256, and a string has at most 32 bytes
   (but a literal argument of a builtin can be longer).
 
-Where the docs and solc 0.8.33 differ, these are as in solc. A declaration cannot use the name of
-a builtin or a name that the dialect reserves. A function can be in the body of a loop in the
-init block of a loop. The names that {lit}`datasize` and {lit}`dataoffset` can refer to are as in
+Where the docs and solc 0.8.33 differ, these are as in solc, but no function is anywhere in an
+init block, as in the docs. A declaration cannot use the name of a builtin or a name that the
+dialect reserves. The names that {lit}`datasize` and {lit}`dataoffset` can refer to are as in
 {lit}`Object::Structure` of solc.
 
-{lit}`lake test` fuzzes {lit}`Object.WellFormed` against the analysis of solc.
+{lit}`lake test` fuzzes {lit}`Object.WellFormed` against the analysis of solc, and skips the
+functions in init blocks that solc accepts.
 -/
 
 namespace Yul
-
--- The part of a for loop that a statement is in. A function in a loop is not in the loop.
-inductive LoopPart where
-  | Outside
-  | Init
-  | Post
-  | Body
-  deriving DecidableEq
 
 -- What is in scope at a statement
 structure Scope where
@@ -44,7 +37,11 @@ structure Scope where
   funs : List (Identifier × Nat × Nat) := []
   -- the variables outside the function: they are not in scope, but a declaration cannot use them
   hidden : List Identifier := []
-  loop : LoopPart := .Outside
+  -- in the body of the innermost loop, and not in a function in it: `break` and `continue` can be
+  -- here
+  inLoopBody : Bool := false
+  -- in the init block of a loop, at any depth: no function can be here
+  inInit : Bool := false
   inFunction : Bool := false
 
 /-- a literal fits in a word -/
@@ -135,7 +132,7 @@ def Statement.WellFormed (Γ : Scope) : Statement → Prop
   | .Block b => b.WellFormed Γ
   | .FunctionDefinition _ ps rs body =>
     -- the name is in scope already: it is a function of the block
-    Γ.loop ≠ .Init ∧ Γ.Declares d (ps ++ rs) ∧
+    !Γ.inInit ∧ Γ.Declares d (ps ++ rs) ∧
       body.WellFormed
         { vars := ps ++ rs, funs := Γ.funs, hidden := Γ.vars ++ Γ.hidden, inFunction := true }
   | .VariableDeclaration xs v =>
@@ -148,10 +145,11 @@ def Statement.WellFormed (Γ : Scope) : Statement → Prop
   | .Expression e => e.WellFormed d names Γ 0
   -- the variables of the init block are in scope in the rest of the loop
   | .ForLoop ⟨init⟩ c post body =>
-    let Γ' := init.foldl Scope.after { Γ with loop := .Init }
-    statementsWellFormed { Γ with loop := .Init } init ∧ c.WellFormed d names Γ' 1 ∧
-      body.WellFormed { Γ' with loop := .Body } ∧ post.WellFormed { Γ' with loop := .Post }
-  | .Break | .Continue => Γ.loop = .Body
+    let Γi := { Γ with inLoopBody := false, inInit := true }
+    let Γ' := { init.foldl Scope.after Γi with inInit := Γ.inInit }
+    statementsWellFormed Γi init ∧ c.WellFormed d names Γ' 1 ∧
+      body.WellFormed { Γ' with inLoopBody := true } ∧ post.WellFormed Γ'
+  | .Break | .Continue => Γ.inLoopBody
   | .Leave => Γ.inFunction
 
 end

@@ -62,9 +62,12 @@ example : Statement := [yul| let := 1 |]
 def wellFormed (code : String) : Bool :=
   (Object.parseWellFormed EVM.dialect s!"object \"A\" \{ code {code} }").toOption.isSome
 
--- where the docs and solc 0.8.33 differ, as solc: a function can be in the body of a loop in the
--- init block of a loop, but not in the init block
-#guard wellFormed "{ for { for {} 1 {} { function f() {} } } 1 {} {} }"
-#guard !wellFormed "{ for { function f() {} } 1 {} {} }"
+-- as in the docs, no function is anywhere in an init block; solc 0.8.33 accepts the first two
+-- (its test `function_defined_in_init_nested_1.yul` has the second)
+#guard ["{ for { for {} 1 {} { function f() {} } } 1 {} {} }",
+  "{ for { for {} 1 { function f() {} } {} } 1 {} {} }",
+  "{ for { function f() {} } 1 {} {} }"].all (!wellFormed ·)
+-- but `break` is in the body of the innermost loop
+#guard wellFormed "{ for { for {} 1 {} { break } } 1 {} {} }"
 
 end Yul.Test

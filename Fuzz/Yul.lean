@@ -21,7 +21,8 @@ For `o`, for the text with one character changed that we parse, and for `o` with
 its AST (`mutateObject`): solc accepts the object if and only if it is well-formed in the EVM
 dialect (`Object.WellFormed`, `checkWellFormed`). Objects that call builtins of solc that are
 not builtins of the EVM dialect (`otherBuiltins`) tell nothing about `Object.WellFormed`, so
-these cases are skipped.
+these cases are skipped. solc accepts some functions in init blocks, which the docs forbid
+(`functionInInit`), so these cases are skipped too.
 
 Two valid ASTs are equal if their printouts are equal, since `Object.parse_print` makes printing
 injective on valid ASTs.
@@ -123,10 +124,24 @@ it -/
 def otherBuiltins (o : Object) : Bool :=
   (allNames o).any fun (x, call) => call && EVM.reserved x && (EVM.builtin x).isNone
 
+/-- the object has a function in the init block of a loop: the docs forbid it anywhere there, but
+solc accepts it in the body or post block of a loop in the init block -/
+partial def functionInInit (o : Object) : Bool :=
+  block false o.code || o.objects.any functionInInit
+where
+  block (init : Bool) : Block → Bool
+    | ⟨ss⟩ => ss.any (stmt init)
+  stmt (init : Bool) : Statement → Bool
+    | .FunctionDefinition _ _ _ b => init || block init b
+    | .Block b | .If _ b => block init b
+    | .ForLoop i _ p b => block true i || block init p || block init b
+    | _ => false
+
 /-- a difference between solc and `Object.WellFormed` on `o` and its text, if solc accepts it
 (`accepted`) or not -/
 def wellFormedAsSolc (o : Object) (text : String) (accepted : Bool) : Option String :=
-  if otherBuiltins o || decide (o.WellFormed EVM.dialect) == accepted then none
+  if otherBuiltins o || (accepted && functionInInit o) ||
+    decide (o.WellFormed EVM.dialect) == accepted then none
   else if accepted then some s!"solc accepts\n{text}\nbut it is not well-formed"
   else some s!"solc does not accept\n{text}\nbut it is well-formed"
 
