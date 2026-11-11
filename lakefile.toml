@@ -8,3 +8,10 @@ name = "YulSemnaticsZoo"
 
 [[lean_lib]]
 name = "Tests"
+
+[[lean_lib]]
+name = "Fuzz"
+
+[[lean_exe]]
+name = "fuzz-asm"
+root = "Fuzz.Main"
