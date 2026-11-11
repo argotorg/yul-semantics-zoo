@@ -109,4 +109,16 @@ def decode (b : UInt8) (rest : List UInt8) : Option (Instr × List UInt8) :=
     some (decodePush ⟨b.toNat - 0x5f, by omega⟩ rest)
   else (ofByte b).map (·, rest)
 
+/-- the decoded instructions of `bytes`; `none` where a byte is not a defined opcode -/
+def disassemble (bytes : List UInt8) : List (Option Instr) :=
+  go bytes.length bytes
+where
+  /-- each step takes at least one byte, so `bytes.length` steps take all bytes -/
+  go : Nat → List UInt8 → List (Option Instr)
+    | 0, _ | _, [] => []
+    | k + 1, b :: rest =>
+      match decode b rest with
+      | some (i, rest) => some i :: go k rest
+      | none => none :: go k rest
+
 end EVM

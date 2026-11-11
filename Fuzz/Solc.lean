@@ -24,18 +24,6 @@ def asmJson (instrs : List Instr) (data : List UInt8) : String :=
     if data.isEmpty then [] else [s!"\{\"name\":\"VERBATIM\",\"value\":\"{hex data}\"}"]
   "{\".code\":[" ++ ",".intercalate (tags.2 ++ verbatim) ++ "],\"sourceList\":[]}"
 
-/-- the decoded instructions of `bytes`; `none` where a byte is not a defined opcode -/
-def disassemble (bytes : List UInt8) : List (Option Instr) :=
-  go bytes.length bytes
-where
-  /-- each step takes at least one byte, so `bytes.length` steps take all bytes -/
-  go : Nat → List UInt8 → List (Option Instr)
-    | 0, _ | _, [] => []
-    | k + 1, b :: rest =>
-      match decode b rest with
-      | some (i, rest) => some i :: go k rest
-      | none => none :: go k rest
-
 /-- the names of the instructions in the tiny EVM -/
 def names : List String :=
   ["STOP", "ADD", "EQ", "CODECOPY", "EXTCODECOPY", "POP", "MLOAD", "MSTORE", "JUMP", "JUMPI",
