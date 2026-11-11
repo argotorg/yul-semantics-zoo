@@ -55,7 +55,7 @@ def dataName : Builtin → Option String
   | .Dataoffset name | .Datasize name => some name
   | _ => none
 
-/-- the instructions of the EVM in solc 0.8.33, without the ones that are only in EOF -/
+/-- the instructions of the EVM in solc 0.8.38, without the ones that are only in EOF -/
 def instructions : List String :=
   ["stop", "add", "sub", "mul", "div", "sdiv", "mod", "smod", "exp", "not", "lt", "gt", "slt",
    "sgt", "eq", "iszero", "and", "or", "xor", "byte", "shl", "shr", "sar", "clz", "addmod",
@@ -70,7 +70,7 @@ def instructions : List String :=
   (List.range 33).map (s!"push{·}") ++ (List.range 16).map (s!"dup{· + 1}") ++
   (List.range 16).map (s!"swap{· + 1}")
 
-/-- the names that solc 0.8.33 does not let a declaration use: the instructions, the object
+/-- the names that solc 0.8.38 does not let a declaration use: the instructions, the object
 builtins, and each name that starts with {lit}`verbatim` -/
 def reserved (x : Identifier) : Bool :=
   x.startsWith "verbatim" || instructions.contains x ||

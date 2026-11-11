@@ -3,9 +3,10 @@ import YulSemnaticsZoo.EVM.Printer
 /-!
 # Fuzzing the EVM encoding against solc
 
-`solc --import-asm-json --bin --opcodes` assembles a list of instructions, and prints the
-bytes and its disassembly of the bytes. This module makes the input for solc and checks its
-output against `EVM.Instr.encode` and `EVM.decode`.
+`solc --experimental --import-asm-json --bin --opcodes` assembles a list of instructions (the
+asm JSON import is experimental since solc 0.8.35), and prints the bytes and its disassembly of
+the bytes. This module makes the input for solc and checks its output against
+`EVM.Instr.encode` and `EVM.decode`.
 -/
 
 namespace Fuzz
@@ -43,11 +44,5 @@ where
       m.isPrefixOf ts && go is (ts.drop m.length)
     | none :: is, t :: ts => !names.contains t && go is ts
     | none :: _, [] => false
-
-/-- The bytes that the disassembler of solc 0.8.33 reads with an immediate also in legacy
-code: the EOF instructions `DATALOADN`, `RJUMP`, `RJUMPI`, `CALLF`, `JUMPF`, `DUPN`, `SWAPN`,
-`EOFCREATE`, `RETURNCONTRACT`. The fuzzer does not give them to solc. In legacy code these
-bytes are not defined, and `Tests/Fuzz.lean` checks that they decode to `none`. -/
-def eofImmediate : List Nat := [0xd1, 0xe0, 0xe1, 0xe3, 0xe5, 0xe6, 0xe7, 0xec, 0xee]
 
 end Fuzz

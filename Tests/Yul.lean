@@ -23,7 +23,7 @@ def result : Except String String → Option String
 #guard ["let function := 1", "x := 12ab", "x := \"abc", "let x : u256 := 1", "let := 1"].all
   fun s => result ((Statement.parse s).map (·.print)) == none
 
--- where the docs grammar and solc 0.8.33 differ, as solc: only a call is an expression
+-- where the docs grammar and solc 0.8.38 differ, as solc: only a call is an expression
 -- statement, a decimal number has no leading zero, a declared name does not end with `.` and
 -- has no `..`, a backslash before a new line in a string is no character, a hex literal can
 -- have one `_` between two pairs of digits, and function parameters can end with a comma
@@ -62,7 +62,7 @@ example : Statement := [yul| let := 1 |]
 def wellFormed (code : String) : Bool :=
   (Object.parseWellFormed EVM.dialect s!"object \"A\" \{ code {code} }").toOption.isSome
 
--- as in the docs, no function is anywhere in an init block; solc 0.8.33 accepts the first two
+-- as in the docs, no function is anywhere in an init block; solc 0.8.38 accepts the first two
 -- (its test `function_defined_in_init_nested_1.yul` has the second)
 #guard ["{ for { for {} 1 {} { function f() {} } } 1 {} {} }",
   "{ for { for {} 1 { function f() {} } {} } 1 {} {} }",

@@ -18,7 +18,7 @@ The restrictions on ASTs that the grammar does not express, for a dialect:
 * each literal fits in a word: a number is less than 2^256, and a string has at most 32 bytes
   (but a literal argument of a builtin can be longer).
 
-Where the docs and solc 0.8.33 differ, these are as in solc, but no function is anywhere in an
+Where the docs and solc 0.8.38 differ, these are as in solc, but no function is anywhere in an
 init block, as in the docs. A declaration cannot use the name of a builtin or a name that the
 dialect reserves. The names that {lit}`datasize` and {lit}`dataoffset` can refer to are as in
 {lit}`Object::Structure` of solc.

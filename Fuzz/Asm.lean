@@ -11,11 +11,6 @@ them against `solc` (see `Fuzz.Solc`). `solc` must be on the path.
 namespace Fuzz
 open EVM Instr
 
-/-- a random byte that is not in `eofImmediate` -/
-def dataByte : Gen UInt8 := do
-  let bytes := (List.range 256).filter (!eofImmediate.contains ·)
-  return (bytes.getD (← nat 0 (bytes.length - 1)) 0).toUInt8
-
 def simple : List Instr :=
   [.Stop, .Add, .Eq, .Codecopy, .Extcodecopy, .Pop, .Mload, .Mstore, .Jump, .Jumpi, .Gas,
    .Jumpdest, .Create, .Call, .Return]
@@ -33,7 +28,7 @@ def instr : Gen Instr := do
 
 /-- instructions, and bytes after them -/
 def case : Gen (List Instr × List UInt8) :=
-  return (← list (← nat 0 20) instr, ← list (← nat 0 32) dataByte)
+  return (← list (← nat 0 20) instr, ← list (← nat 0 32) byte)
 
 /-- the bytes and the disassembly that solc gives for asm JSON -/
 def solc (json : String) : IO (Except String (String × String)) := do
@@ -41,7 +36,8 @@ def solc (json : String) : IO (Except String (String × String)) := do
   h.putStr json
   h.flush
   let out ← IO.Process.output
-    { cmd := "solc", args := #["--import-asm-json", "--bin", "--opcodes", path.toString] }
+    { cmd := "solc"
+      args := #["--experimental", "--import-asm-json", "--bin", "--opcodes", path.toString] }
   IO.FS.removeFile path
   let lines := out.stdout.splitOn "\n"
   let after (header : String) := ((lines.dropWhile (· != header)).drop 1).head?

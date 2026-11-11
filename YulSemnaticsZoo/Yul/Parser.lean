@@ -13,7 +13,7 @@ enough fuel.
 After a word, the next token tells the statement: {lit}`(` starts a function call, {lit}`,` or
 {lit}`:=` an assignment.
 
-Where the grammar and solc 0.8.33 differ, it parses as solc: only a call is an expression
+Where the grammar and solc 0.8.38 differ, it parses as solc: only a call is an expression
 statement, a declared name does not end with {lit}`.` and has no {lit}`..`, and function parameters
 can end with a comma.
 -/

@@ -14,8 +14,9 @@ For a random object `o` (`Fuzz.Yul.object`) and random text for it (`Fuzz.Yul.te
 Then for the text with one character changed (`mutate`): if the parser of solc rejects it, ours
 does; if only the analysis of solc rejects it, ours accepts it; if solc accepts it, ours parses it
 to the AST of the solc printout (`checkMutation`, `solc`). Errors of solc about builtins (its
-parser knows the dialect, ours does not), internal errors of solc, and names that solc does not
-print back (`plainNames`) tell nothing about our parser, so these cases are skipped.
+parser knows the dialect, ours does not), internal errors of solc, and object names that are not
+ASCII (solc parses them, ours does not) tell nothing about our parser, so these cases are
+skipped.
 
 For `o`, for the text with one character changed that we parse, and for `o` with one change to
 its AST (`mutateObject`): solc accepts the object if and only if it is well-formed in the EVM
@@ -94,16 +95,8 @@ def solc (text : String) : IO Solc := do
 def ir (contracts : Json) (name : String) : Option String :=
   ((contracts.getObjValD name).getObjValD "ir").getStr?.toOption
 
-/-- the names of objects and data are printable ASCII without `\` and `"`: solc prints names
-without escapes (and fails on other names, see `Solc.failed`), so only these come back the same
-in its printout -/
-partial def plainNames (o : Object) : Bool :=
-  let plain (s : String) := s.toList.all fun c => ' ' ≤ c && c ≤ '~' && c != '\\' && c != '"'
-  plain o.name && o.data.all (plain ·.name) && o.objects.all plainNames
-
 /-- our parse of the solc printout of `o` is `o` -/
 def sameAsSolc (o : Object) (contracts : Json) (text : String) : Option String :=
-  if !plainNames o then none else
   match ir contracts o.name with
   | none => some s!"solc has no printout of {o.name} for\n{text}"
   | some ir =>
@@ -187,12 +180,9 @@ accepts it, we parse it to a well-formed AST, the AST of the solc printout; if o
 of solc rejects it, we parse it to an AST that is not well-formed; if the parser of solc rejects
 it, we do not parse it -/
 def checkMutation (text : String) : IO (Option String) := do
-  -- solc parses its printout again, which has names without escapes, so it reads names that
-  -- are not plain in other ways; and our parser rejects names that are not ASCII, which solc
-  -- parses
-  match Object.parse text with
-  | .ok o => if !plainNames o then return none
-  | .error e => if e == asciiNameError then return none
+  -- our parser rejects object names that are not ASCII, which solc parses
+  if let .error e := Object.parse text then
+    if e == asciiNameError then return none
   match Object.parse text, ← solc text with
   | .ok ours, .accepted contracts =>
     return wellFormedAsSolc ours text true <|> sameAsSolc ours contracts text

@@ -9,7 +9,7 @@ Text to tokens, for the grammar in the "Specification of Yul" and "Specification
 sections of the solidity docs. The lexer also reads comments, `0x` numbers, `hex"…"` literals and
 the escapes `\\ \" \' \n \r \t \xNN \uNNNN` in strings.
 
-Where the grammar and solc 0.8.33 differ, it reads as solc: a backslash before a new line in a
+Where the grammar and solc 0.8.38 differ, it reads as solc: a backslash before a new line in a
 string is no character, a hex literal can have one {lit}`_` between two pairs of digits, and a
 decimal number does not start with {lit}`0`.
 -/
