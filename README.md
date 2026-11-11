@@ -5,7 +5,7 @@ goal is to explore which semantic styles are best suited for a compiler correctn
 yul and the evm.
 
 It is defined as a literate [verso](https://verso.lean-lang.org/) document. The `main` branch is
-published at [https://argotorg.github.io/yul-semantics-zoo].
+published at https://argotorg.github.io/yul-semantics-zoo.
 
 ## Developing
 
