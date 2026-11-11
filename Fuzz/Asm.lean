@@ -1,13 +1,14 @@
 import Fuzz.Solc
 
 /-!
-# `lake exe fuzz-asm [cases] [seed]`
+# Fuzzing the EVM encoding against solc
 
 Generates random instructions and bytes, and checks `EVM.Instr.encode` and `EVM.decode` on
 them against `solc` (see `Fuzz.Solc`). `solc` must be on the path.
 -/
 
-open EVM Instr Fuzz
+namespace Fuzz
+open EVM Instr
 
 abbrev Gen := StateM StdGen
 
@@ -78,12 +79,17 @@ def run (g : StdGen) (i : Nat) : Nat → IO (Option (Nat × String))
     | some err => return some (i, err)
     | none => run g (i + 1) k
 
-def main (args : List String) : IO UInt32 := do
+/-- `[cases] [seed]`: check `cases` cases (200 if not given) from `seed` (the clock if not
+given); 0 if there are no differences -/
+def fuzz (args : List String) : IO UInt32 := do
   let cases := (args[0]? >>= String.toNat?).getD 200
   let seed ← match args[1]? >>= String.toNat? with
     | some s => pure s
     | none => pure ((← IO.monoNanosNow) % 2 ^ 32)
-  IO.println s!"seed {seed}: {cases} cases"
+  IO.println s!"fuzz seed {seed}: {cases} cases"
+  (← IO.getStdout).flush
   match ← run (mkStdGen seed) 0 cases with
   | some (i, err) => IO.eprintln s!"case {i}: {err}"; return 1
   | none => IO.println "no differences"; return 0
+
+end Fuzz

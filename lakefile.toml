@@ -1,7 +1,7 @@
 name = "yul-semnatics-zoo"
 version = "0.1.0"
 defaultTargets = ["YulSemnaticsZoo"]
-testDriver = "Tests"
+testDriver = "tests"
 
 [[lean_lib]]
 name = "YulSemnaticsZoo"
@@ -13,5 +13,5 @@ name = "Tests"
 name = "Fuzz"
 
 [[lean_exe]]
-name = "fuzz-asm"
-root = "Fuzz.Main"
+name = "tests"
+root = "TestMain"
