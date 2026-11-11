@@ -12,7 +12,7 @@
   in {
     devShells = forAllSystems (pkgs: {
       default = pkgs.mkShell {
-        packages = [ pkgs.elan ];
+        packages = [ pkgs.elan pkgs.solc pkgs.go-ethereum ];
       };
     });
   };

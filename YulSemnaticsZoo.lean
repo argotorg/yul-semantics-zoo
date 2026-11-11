@@ -1,3 +1,4 @@
--- This module serves as the root of the `YulSemnaticsZoo` library.
--- Import modules here that should be built as part of the library.
-import YulSemnaticsZoo.Basic
+import YulSemnaticsZoo.Yul.Syntax
+import YulSemnaticsZoo.Yul.Dialect
+import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.EVM.Syntax
