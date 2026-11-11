@@ -184,10 +184,14 @@ partial def stmt (env : Env) (funs : Bool) (d : Nat) : YGen (Statement × Env) :
 
 end
 
-/-- a name for an object or data; some have a `.`, which `datasize` cannot refer to -/
+/-- a name for an object or data; some have a `.`, which `datasize` cannot refer to, and some
+have characters that are not ASCII -/
 def objectName (p : String) : YGen String := do
   let n ← fresh p
-  if (← nat 0 4) == 0 then return n ++ ".x" else return n
+  match ← nat 0 5 with
+  | 0 => return n ++ ".x"
+  | 1 => return n ++ (← pick ["é", "Ω", "€", "😀"] "é")
+  | _ => return n
 
 /-- the paths to the data of the sub-objects of an object -/
 partial def subData (o : Object) : List String :=
@@ -268,9 +272,10 @@ where
     | .ForLoop i c p b => return .ForLoop (← mapList k f i) c (← mapList k f p) (← mapList k f b)
     | s => return s
 
-/-- a statement that often breaks a rule: with a name of `ns` (which can be in scope or not),
-the wrong number of values, or a literal that is too large -/
-def wrongStmt (ns : List Identifier) : Gen Statement := do
+/-- a statement that often breaks a rule: with a name of `ns` (which can be in scope or not), a
+path of `ps` in `datasize` or `dataoffset`, the wrong number of values, or a literal that is too
+large -/
+def wrongStmt (ns : List Identifier) (ps : List String) : Gen Statement := do
   let n ← pick ns "x"
   let arg : Gen Expression := return .Literal (.NumberLiteral 1)
   match ← nat 0 9 with
@@ -288,7 +293,7 @@ def wrongStmt (ns : List Identifier) : Gen Statement := do
   | 7 => return .Expression (.FunctionCall "verbatim_0i_0o" [.Literal (.StringLiteral [])])
   | 8 => return .If (.FunctionCall n (← list (← nat 0 2) arg)) ⟨[]⟩
   | _ => return .Expression (.FunctionCall "mstore"
-      [← arg, .FunctionCall (← pick ["datasize", "dataoffset"] "") [str (← pick ns "x")]])
+      [← arg, .FunctionCall (← pick ["datasize", "dataoffset"] "") [str (← pick ps "x")]])
 
 /-- the object with a random change to its code that can break a rule: a name replaced with
 another name of the code, a statement deleted, or a statement inserted -/
@@ -305,8 +310,10 @@ def mutateObject (o : Object) : Gen Object := do
         |>.run' 0)
     | _ =>
       let i ← nat 0 99
+      let paths := o.name :: allPaths o
       -- with names that solc reserves
-      let s ← wrongStmt (ns ++ o.name :: allPaths o ++ ["sub", "jump", "verbatim", "verbatimx"])
+      let s ← wrongStmt (ns ++ paths.filter validIdent ++ ["sub", "jump", "verbatim", "verbatimx"])
+        (ns ++ paths)
 
       pure ((mapList (← nat 0 (lists - 1)) (fun ss =>
         ss.take (i % (ss.length + 1)) ++ s :: ss.drop (i % (ss.length + 1))) o.code).run' 0)

@@ -7,8 +7,8 @@ set_option doc.verso true
 
 The ASTs that the grammar can express: each identifier is an identifier of the grammar and not a
 keyword, a declared name does not end with {lit}`.` and has no {lit}`..`, an expression statement
-is a call, a {lit}`let` or an assignment has variables, each object and data name is ASCII, and the
-names of an object have no {lit}`namesError`. For these, parsing the printed text gives the AST (`Yul.Object.parse_print`).
+is a call, a {lit}`let` or an assignment has variables, and the names of an object have no
+{lit}`namesError`. For these, parsing the printed text gives the AST (`Yul.Object.parse_print`).
 -/
 
 namespace Yul
@@ -50,14 +50,11 @@ def Statement.valid : Statement → Bool
 
 end
 
-def isAscii (s : String) : Bool := s.toList.all (·.toNat < 128)
-
 mutual
 
 def Object.valid : Object → Bool
   | ⟨name, code, objects, data⟩ =>
-    isAscii name && code.valid && objectsValid objects && data.all (isAscii ·.name) &&
-      (namesError name objects data).isNone
+    code.valid && objectsValid objects && (namesError name objects data).isNone
 
 def objectsValid : List Object → Bool
   | [] => true

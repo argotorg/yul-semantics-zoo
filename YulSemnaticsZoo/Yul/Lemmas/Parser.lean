@@ -424,29 +424,11 @@ theorem parseStatement_pieces : ∀ (s : Statement), s.valid = true → ∀ (k :
 
 end
 
-theorem map_ascii (l : List Char) (h : ∀ c ∈ l, c.toNat < 128) :
-    (l.map (·.toNat.toUInt8)).map (fun b => Char.ofNat b.toNat) = l := by
-  induction l with
-  | nil => rfl
-  | cons c l ih =>
-    simp only [List.map_cons]
-    rw [ih (fun d hd => h d (by simp [hd]))]
-    have := h c (by simp)
-    simp [Nat.mod_eq_of_lt (by omega : c.toNat < 256)]
+theorem utf8Name_utf8 (s : String) : utf8Name (utf8 s) = .ok s := by
+  have hb : (⟨(utf8 s).toArray⟩ : ByteArray) = s.toByteArray := by simp [utf8]
+  simp only [utf8Name, hb, String.fromUTF8?, dite_eq_left s.isValidUTF8, String.fromUTF8]
 
-theorem asciiName_ascii (s : String) (h : isAscii s = true) : asciiName (ascii s) = .ok s := by
-  simp only [isAscii, List.all_eq_true, decide_eq_true_eq] at h
-  have hall : (ascii s).all (· < 128) = true := by
-    simp only [ascii, List.all_map, List.all_eq_true, Function.comp_apply, decide_eq_true_eq]
-    intro c hc
-    have := h c hc
-    simp [UInt8.lt_iff_toNat_lt, Nat.mod_eq_of_lt (by omega : c.toNat < 256), this]
-  unfold asciiName
-  rw [ite_eq_left_iff.mpr (fun h => absurd hall h)]
-  unfold ascii
-  rw [map_ascii _ h, String.ofList_toList]
-
-theorem parseItems_data (ds : List Data) (hv : ds.all (isAscii ·.name) = true) (k : Nat)
+theorem parseItems_data (ds : List Data) (k : Nat)
     (r : List Token) (n : Nat) (hn : 3 * ((tokens (ds.flatMap (Data.pieces k))).length + 1) ≤ n) :
     parseItems n (tokens (ds.flatMap (Data.pieces k)) ++ .Sym .RBrace :: r) =
       .ok (([], ds), r) := by
@@ -455,14 +437,13 @@ theorem parseItems_data (ds : List Data) (hv : ds.all (isAscii ·.name) = true) 
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     rfl
   | cons d ds ih =>
-    simp only [List.all_cons, Bool.and_eq_true] at hv
     simp only [List.flatMap_cons, Data.pieces, word_eq, tokens_line, tokens_tok,
       List.cons_append, List.nil_append, List.length_cons] at hn ⊢
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     rw [parseItems.eq_def]
-    simp only [asciiName_ascii d.name hv.1]
+    simp only [utf8Name_utf8 d.name]
     bind_simp
-    rw [ih hv.2 m (by omega)]
+    rw [ih m (by omega)]
 
 mutual
 
@@ -470,30 +451,30 @@ theorem parseObject_pieces : ∀ (o : Object), o.valid = true → ∀ (k : Nat) 
     3 * (tokens (o.pieces k)).length ≤ n → parseObject n (tokens (o.pieces k) ++ r) = .ok (o, r)
   | ⟨name, code, objects, data⟩, hv, k, r, n, hn => by
     simp only [Object.valid, Bool.and_eq_true] at hv
-    obtain ⟨⟨⟨⟨hname, hcode⟩, hobjects⟩, hdata⟩, hnames⟩ := hv
+    obtain ⟨⟨hcode, hobjects⟩, hnames⟩ := hv
     simp only [Object.pieces, word_eq, sym_eq, tokens_tok, tokens_line, tokens_append,
       tokens_nil, List.cons_append, List.append_assoc, List.nil_append, List.length_cons,
       List.length_append, List.length_nil] at hn ⊢
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     rw [parseObject.eq_def]
-    simp only [asciiName_ascii name hname]
+    simp only [utf8Name_utf8 name]
     bind_simp
     rw [parseBlock_pieces code hcode (k + 2) _ m (by omega)]
     simp only
-    rw [← List.append_assoc, parseItems_pieces objects hobjects data hdata (k + 2) r m (by omega)]
+    rw [← List.append_assoc, parseItems_pieces objects hobjects data (k + 2) r m (by omega)]
     simp only [Option.isNone_iff_eq_none] at hnames
     simp only [hnames]
 
 theorem parseItems_pieces : ∀ (os : List Object), objectsValid os = true →
-    ∀ (ds : List Data), ds.all (isAscii ·.name) = true → ∀ (k : Nat) (r : List Token) n,
+    ∀ (ds : List Data) (k : Nat) (r : List Token) n,
     3 * ((tokens (objectsPieces k os)).length + (tokens (ds.flatMap (Data.pieces k))).length + 1)
       ≤ n →
     parseItems n (tokens (objectsPieces k os) ++ tokens (ds.flatMap (Data.pieces k)) ++
       .Sym .RBrace :: r) = .ok ((os, ds), r)
-  | [], _, ds, hds, k, r, n, hn => by
+  | [], _, ds, k, r, n, hn => by
     simp only [objectsPieces, tokens_nil, List.nil_append, List.length_nil] at hn ⊢
-    exact parseItems_data ds hds k r n (by omega)
-  | ⟨name, code, objects, data⟩ :: os, hv, ds, hds, k, r, n, hn => by
+    exact parseItems_data ds k r n (by omega)
+  | ⟨name, code, objects, data⟩ :: os, hv, ds, k, r, n, hn => by
     simp only [objectsValid, Bool.and_eq_true] at hv
     have hle : 1 ≤ (tokens (Object.pieces k ⟨name, code, objects, data⟩)).length := by
       simp [Object.pieces]
@@ -511,7 +492,7 @@ theorem parseItems_pieces : ∀ (os : List Object), objectsValid os = true →
     · simp_all
     rw [ho]
     bind_simp
-    rw [← List.append_assoc, parseItems_pieces os hv.2 ds hds k r m (by omega)]
+    rw [← List.append_assoc, parseItems_pieces os hv.2 ds k r m (by omega)]
 
 end
 

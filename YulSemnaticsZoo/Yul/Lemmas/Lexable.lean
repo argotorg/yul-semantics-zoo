@@ -156,8 +156,8 @@ theorem object_lexable : ∀ (o : Object), o.valid = true → ∀ k,
     (tokens (o.pieces k)).all Token.lexable = true
   | ⟨name, code, objects, data⟩, hv, k => by
     simp only [Object.valid, Bool.and_eq_true] at hv
-    lexable_simp [Object.pieces, block_lexable code hv.1.1.1.2 (k + 2),
-      objects_lexable objects hv.1.1.2 (k + 2), data_lexable data (k + 2)]
+    lexable_simp [Object.pieces, block_lexable code hv.1.1 (k + 2),
+      objects_lexable objects hv.1.2 (k + 2), data_lexable data (k + 2)]
 
 theorem objects_lexable : ∀ (os : List Object), objectsValid os = true → ∀ k,
     (tokens (objectsPieces k os)).all Token.lexable = true

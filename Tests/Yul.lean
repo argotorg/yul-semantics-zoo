@@ -51,6 +51,11 @@ def result : Except String String → Option String
     "object \"A\" { code { } object \"B\" { code { } object \"A\" { code { } } } }").map (·.print))
   != none
 
+-- as in solc, a name of an object or data is UTF-8
+#guard (Object.parse "object \"\\u00e9\" { code { } data \"\\xc3\\xa9x\" \"\" }").toOption.map
+    (fun o => (o.name, o.data.map (·.name))) == some ("é", ["éx"])
+#guard result ((Object.parse "object \"\\xff\" { code { } }").map (·.print)) == none
+
 example : ([yul| { let x := add(1, 2) } |] : Block) =
     ⟨[.VariableDeclaration ["x"] (some (.FunctionCall "add"
       [.Literal (.NumberLiteral 1), .Literal (.NumberLiteral 2)]))]⟩ := rfl

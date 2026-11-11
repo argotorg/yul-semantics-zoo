@@ -15,7 +15,7 @@ After a word, the next token tells the statement: {lit}`(` starts a function cal
 
 Where the grammar and solc 0.8.38 differ, it parses as solc: only a call is an expression
 statement, a declared name does not end with {lit}`.` and has no {lit}`..`, and function parameters
-can end with a comma.
+can end with a comma. But an object or data name must be UTF-8, since it is a {name}`String`.
 -/
 
 namespace Yul
@@ -181,12 +181,13 @@ def parseStatement : Nat → List Token → Except String (Statement × List Tok
 
 end
 
-def asciiNameError : String := "an object or data name must be ASCII"
+def utf8NameError : String := "an object or data name must be UTF-8"
 
-/-- the string of the bytes of a string literal, which must be ASCII -/
-def asciiName (bs : List UInt8) : Except String String :=
-  if bs.all (· < 128) then .ok (String.ofList (bs.map fun b => Char.ofNat b.toNat))
-  else .error asciiNameError
+/-- the string of the bytes of a string literal, which must be UTF-8 -/
+def utf8Name (bs : List UInt8) : Except String String :=
+  match String.fromUTF8? ⟨bs.toArray⟩ with
+  | some s => .ok s
+  | none => .error utf8NameError
 
 /-- the first error in the names of an object, as in solc: a name is empty, a child (an object or
 data in it) has the name of the object, or two children have one name -/
@@ -202,7 +203,7 @@ mutual
 def parseObject : Nat → List Token → Except String (Object × List Token)
   | 0, _ => .error "out of fuel"
   | n + 1, .Word "object" :: .Str name :: .Sym .LBrace :: .Word "code" :: r => do
-    let name ← asciiName name
+    let name ← utf8Name name
     let (code, r) ← parseBlock n r
     let ((objects, data), r) ← parseItems n r
     match namesError name objects data with
@@ -216,7 +217,7 @@ def parseItems : Nat → List Token → Except String ((List Object × List Data
   | n + 1, ts => match ts with
     | .Sym .RBrace :: r => .ok (([], []), r)
     | .Word "data" :: .Str name :: .Str value :: r => do
-      let name ← asciiName name
+      let name ← utf8Name name
       let ((os, ds), r) ← parseItems n r
       return ((os, ⟨name, value⟩ :: ds), r)
     | _ => do

@@ -71,8 +71,8 @@ def tokens (ps : List Piece) : List Token :=
 def word (s : String) : Piece := .tok (.Word s)
 def sym (s : Symbol) : Piece := .tok (.Sym s)
 
-/-- the bytes of an ASCII string -/
-def ascii (s : String) : List UInt8 := s.toList.map (·.toNat.toUInt8)
+/-- the UTF-8 bytes of a string -/
+def utf8 (s : String) : List UInt8 := s.toUTF8.data.toList
 
 def Literal.token : Literal → Token
   | .NumberLiteral n => .Number n
@@ -135,14 +135,14 @@ def Statement.pieces (k : Nat) : Statement → List Piece
 end
 
 def Data.pieces (k : Nat) (d : Data) : List Piece :=
-  [.line k, word "data", .tok (.Str (ascii d.name)), .tok (.Str d.value)]
+  [.line k, word "data", .tok (.Str (utf8 d.name)), .tok (.Str d.value)]
 
 mutual
 
 /-- an object whose {lit}`}` is at indent {name}`k` -/
 def Object.pieces (k : Nat) : Object → List Piece
   | ⟨name, code, objects, data⟩ =>
-    word "object" :: .tok (.Str (ascii name)) :: sym .LBrace :: .line (k + 2) :: word "code" ::
+    word "object" :: .tok (.Str (utf8 name)) :: sym .LBrace :: .line (k + 2) :: word "code" ::
       code.pieces (k + 2) ++ objectsPieces (k + 2) objects ++ data.flatMap (Data.pieces (k + 2)) ++
       [.line k, sym .RBrace]
 
