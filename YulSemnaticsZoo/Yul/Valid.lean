@@ -6,9 +6,9 @@ set_option doc.verso true
 # Yul: valid ASTs
 
 The ASTs that the grammar can express: each identifier is an identifier of the grammar and not a
-keyword, a declared name does not end with {lit}`.`, an expression statement is a call, a {lit}`let`
-or an assignment has variables, each object and data name is ASCII, and the names of an object have
-no {lit}`namesError`. For these, parsing the printed text gives the AST (`Yul.Object.parse_print`).
+keyword, a declared name does not end with {lit}`.` and has no {lit}`..`, an expression statement
+is a call, a {lit}`let` or an assignment has variables, each object and data name is ASCII, and the
+names of an object have no {lit}`namesError`. For these, parsing the printed text gives the AST (`Yul.Object.parse_print`).
 -/
 
 namespace Yul

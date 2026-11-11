@@ -1,14 +1,17 @@
 import Fuzz.Gen
 import YulSemnaticsZoo.Yul.Printer
+import YulSemnaticsZoo.Yul.WellFormed
 
 /-!
 # Random Yul objects, and random text for them
 
-`object` makes objects that the analysis of solc accepts in the EVM dialect: each name is in
-scope and new, each call has the right number of arguments and results, `break` and
-`continue` are in a loop body, `leave` is in a function. `text` prints the tokens of an
-object with random spellings that the printer does not use: comments, white space, hex
-numbers, escapes and hex literals.
+`object` makes objects that are well-formed in the EVM dialect of the tiny Yul, so that the
+analysis of solc accepts them: each name is in scope and new, each call has the right number of
+arguments and results, `break` and `continue` are in a loop body, `leave` is in a function, and
+`datasize` and `dataoffset` refer to sub-objects and data. `mutateObject` changes an object so
+that it can break one of these rules. `text` prints the tokens of an object with random
+spellings that the printer does not use: comments, white space, hex numbers, escapes and hex
+literals.
 -/
 
 namespace Fuzz.Yul
@@ -19,22 +22,22 @@ abbrev YGen := StateT Nat Gen
 
 def fresh (p : String) : YGen String := modifyGet fun k => (p ++ toString k, k + 1)
 
-/-- builtins of the solc EVM dialect with one result: name and number of arguments -/
+/-- builtins of the EVM dialect with no literal arguments and one result: name and number of
+arguments -/
 def builtins1 : List (String × Nat) :=
-  [("add", 2), ("sub", 2), ("mul", 2), ("div", 2), ("eq", 2), ("lt", 2), ("gt", 2),
-   ("iszero", 1), ("not", 1), ("and", 2), ("or", 2), ("xor", 2), ("mload", 1), ("sload", 1),
-   ("gas", 0), ("address", 0), ("caller", 0), ("keccak256", 2)]
+  [("add", 2), ("eq", 2), ("mload", 1), ("gas", 0), ("create", 3), ("call", 7)]
 
-/-- builtins of the solc EVM dialect with no result -/
+/-- builtins of the EVM dialect with no literal arguments and no result -/
 def builtins0 : List (String × Nat) :=
-  [("mstore", 2), ("mstore8", 2), ("sstore", 2), ("pop", 1), ("log0", 2), ("revert", 2),
-   ("return", 2), ("stop", 0)]
+  [("mstore", 2), ("codecopy", 3), ("extcodecopy", 4), ("return", 2), ("datacopy", 3)]
 
 structure Env where
   /-- the variables in scope -/
   vars : List Identifier := []
   /-- the functions in scope: name, number of arguments, number of results -/
   funs : List (Identifier × Nat × Nat) := []
+  /-- the names that `datasize` and `dataoffset` can refer to -/
+  paths : List String := []
   inLoop : Bool := false
   inFun : Bool := false
 
@@ -52,11 +55,35 @@ def literal : Gen Literal := do
   | 4 => return .TrueLiteral
   | _ => return .FalseLiteral
 
+def str (s : String) : Expression := .Literal (.StringLiteral s.toUTF8.toList)
+
+/-- `verbatim_<ins>i_<outs>o` with code that can be longer than 32 bytes -/
+def verbatim (outs : Nat) (arg : Gen Expression) : Gen Expression := do
+  let ins ← nat 0 2
+  let code ← list (← nat 1 40) byte
+  return .FunctionCall s!"verbatim_{ins}i_{outs}o" (.Literal (.StringLiteral code) :: (← list ins arg))
+
+/-- a call of a builtin with literal arguments and `outs` results; not `setimmutable` and
+`loadimmutable`, which solc assembles only for an immutable that the creation code sets and the
+deployed code loads -/
+def literalCall (env : Env) (outs : Nat) (arg : Gen Expression) : Gen Expression := do
+  match outs with
+  | 0 => verbatim 0 arg
+  | 1 =>
+    match ← nat 0 3, env.paths with
+    | 0, ps@(_ :: _) =>
+      return .FunctionCall (← pick ["datasize", "dataoffset"] "") [str (← pick ps "")]
+    | 1, _ => return .FunctionCall "linkersymbol" [str "L"]
+    | 2, _ => return .FunctionCall "memoryguard" [.Literal (.NumberLiteral (← nat 0 (2 ^ 256 - 1)))]
+    | _, _ => verbatim 1 arg
+
+  | n => verbatim n arg
+
 /-- an expression with one value -/
 def expr (env : Env) : Nat → Gen Expression
   | 0 => leaf
   | d + 1 => do
-    match ← nat 0 3 with
+    match ← nat 0 4 with
     | 0 => leaf
     | 1 =>
       let (f, k) ← pick builtins1 ("gas", 0)
@@ -67,6 +94,7 @@ def expr (env : Env) : Nat → Gen Expression
       | fs =>
         let (f, k, _) ← pick fs ("", 0, 0)
         return .FunctionCall f (← list k (expr env d))
+    | 3 => literalCall env 1 (expr env d)
     | _ => leaf
 where
   leaf : Gen Expression := do
@@ -75,16 +103,13 @@ where
 
 /-- a call with no value -/
 def callStmt (env : Env) (d : Nat) : Gen Statement := do
-  match env.funs.filter (·.2.2 == 0) with
-  | fs@(_ :: _) =>
-    if ← coin then
-      let (f, k, _) ← pick fs ("", 0, 0)
-      return .Expression (.FunctionCall f (← list k (expr env d)))
-    else builtin
-  | [] => builtin
-where
-  builtin : Gen Statement := do
-    let (f, k) ← pick builtins0 ("stop", 0)
+  match ← nat 0 2, env.funs.filter (·.2.2 == 0) with
+  | 0, fs@(_ :: _) =>
+    let (f, k, _) ← pick fs ("", 0, 0)
+    return .Expression (.FunctionCall f (← list k (expr env d)))
+  | 1, _ => return .Expression (← literalCall env 0 (expr env d))
+  | _, _ =>
+    let (f, k) ← pick builtins0 ("return", 2)
     return .Expression (.FunctionCall f (← list k (expr env d)))
 
 mutual
@@ -98,7 +123,7 @@ partial def block (env : Env) (funs : Bool) (d : Nat) : YGen Block := do
   let defs ← decls.mapM fun (f, np, nr) => do
     let ps ← (List.range np).mapM fun _ => fresh "p"
     let rs ← (List.range nr).mapM fun _ => fresh "r"
-    let body ← block { vars := ps ++ rs, funs := env.funs, inFun := true } true (d - 1)
+    let body ← block { env with vars := ps ++ rs, inLoop := false, inFun := true } true (d - 1)
     return Statement.FunctionDefinition f ps rs body
   let (ss, _) ← stmts env funs (← nat 0 4) d
   -- the functions of a block are in scope in all of it, so they can be anywhere in it
@@ -128,15 +153,18 @@ partial def stmt (env : Env) (funs : Bool) (d : Nat) : YGen (Statement × Env) :
     | [] => return (← callStmt env (min d 2), env)
     | vs => return (.Assignment [← pick vs ""] (← e ()), env)
   | 2 =>
-    match multi with
-    | [] => return (← callStmt env (min d 2), env)
-    | fs =>
-      let (f, k, n) ← pick fs ("", 0, 0)
-      let call := Expression.FunctionCall f (← list k (expr env (min d 2)))
-      let xs ← (List.range n).mapM fun _ => fresh "v"
-      if (← coin) && env.vars.length ≥ n then
-        return (.Assignment (env.vars.take n) call, env)
-      return (.VariableDeclaration xs (some call), { env with vars := xs ++ env.vars })
+    -- a call with more than one result: of a function, or of verbatim
+    let (call, n) ← match multi, ← coin with
+      | fs@(_ :: _), true => do
+        let (f, k, n) ← pick fs ("", 0, 0)
+        pure (Expression.FunctionCall f (← list k (expr env (min d 2))), n)
+      | _, _ => do
+        let n ← nat 2 3
+        pure (← verbatim n (expr env (min d 2)), n)
+    let xs ← (List.range n).mapM fun _ => fresh "v"
+    if (← coin) && env.vars.length ≥ n then
+      return (.Assignment (env.vars.take n) call, env)
+    return (.VariableDeclaration xs (some call), { env with vars := xs ++ env.vars })
   | 3 => return (← callStmt env (min d 2), env)
   | 4 => return (.If (← e ()) (← block env funs (d - 1)), env)
   | 5 =>
@@ -156,13 +184,133 @@ partial def stmt (env : Env) (funs : Bool) (d : Nat) : YGen (Statement × Env) :
 
 end
 
+/-- a name for an object or data; some have a `.`, which `datasize` cannot refer to -/
+def objectName (p : String) : YGen String := do
+  let n ← fresh p
+  if (← nat 0 4) == 0 then return n ++ ".x" else return n
+
+/-- the paths to the data of the sub-objects of an object -/
+partial def subData (o : Object) : List String :=
+  o.objects.flatMap fun c => (c.data.map (·.name) ++ subData c).map (c.name ++ "." ++ ·)
+
 partial def object (d : Nat) : YGen Object := do
-  let name ← fresh "O"
-  let code ← block {} true 3
+  let name ← objectName "O"
   let objects ← if d = 0 then pure [] else (List.range (← nat 0 2)).mapM fun _ => object (d - 1)
   let data ← (List.range (← nat 0 2)).mapM fun _ => do
-    return ({ name := ← fresh "D", value := ← list (← nat 0 8) byte } : Data)
-  return { name, code, objects, data }
+    return ({ name := ← objectName "D", value := ← list (← nat 0 8) byte } : Data)
+  let o : Object := { name, code := ⟨[]⟩, objects, data }
+  -- not the data of a sub-object: solc analyses `datasize("O.D")`, but it fails to assemble it
+  return { o with code := ← block { paths := o.dataNames.filter (!(subData o).contains ·) } true 3 }
+
+
+/-! ## Mutations -/
+
+/-- the paths from an object to its sub-objects and data, and to theirs -/
+partial def allPaths (o : Object) : List String :=
+  o.data.map (·.name) ++ o.objects.flatMap fun c => c.name :: (allPaths c).map (c.name ++ "." ++ ·)
+
+/-- the names in a block, of variables, functions and parameters, each with whether it is the
+name of a call -/
+partial def blockNames : Block → List (Identifier × Bool)
+  | ⟨ss⟩ => ss.flatMap stmtNames
+where
+  names (xs : List Identifier) := xs.map (·, false)
+  exprNames : Expression → List (Identifier × Bool)
+    | .FunctionCall f args => (f, true) :: args.flatMap exprNames
+    | .Identifier x => [(x, false)]
+    | .Literal _ => []
+  stmtNames : Statement → List (Identifier × Bool)
+    | .Block b => blockNames b
+    | .FunctionDefinition f ps rs b => names (f :: ps ++ rs) ++ blockNames b
+    | .VariableDeclaration xs v => names xs ++ (v.map exprNames).getD []
+    | .Assignment xs e => names xs ++ exprNames e
+    | .If c b => exprNames c ++ blockNames b
+    | .Expression e => exprNames e
+    | .ForLoop i c p b => blockNames i ++ exprNames c ++ blockNames p ++ blockNames b
+    | .Break | .Continue | .Leave => []
+
+/-- the block with the `k`th name (as `blockNames` counts them) replaced by `f` of it; the state
+counts the names before -/
+partial def mapName (k : Nat) (f : Identifier → Identifier) : Block → StateM Nat Block
+  | ⟨ss⟩ => return ⟨← ss.mapM stmt⟩
+where
+  name (x : Identifier) : StateM Nat Identifier :=
+    modifyGet fun i => (if i == k then f x else x, i + 1)
+  expr : Expression → StateM Nat Expression
+    | .FunctionCall g args => return .FunctionCall (← name g) (← args.mapM expr)
+    | .Identifier x => return .Identifier (← name x)
+    | .Literal l => return .Literal l
+  stmt : Statement → StateM Nat Statement
+    | .Block b => return .Block (← mapName k f b)
+    | .FunctionDefinition g ps rs b =>
+      return .FunctionDefinition (← name g) (← ps.mapM name) (← rs.mapM name) (← mapName k f b)
+    | .VariableDeclaration xs v => return .VariableDeclaration (← xs.mapM name) (← v.mapM expr)
+    | .Assignment xs e => return .Assignment (← xs.mapM name) (← expr e)
+    | .If c b => return .If (← expr c) (← mapName k f b)
+    | .Expression e => return .Expression (← expr e)
+    | .ForLoop i c p b =>
+      return .ForLoop (← mapName k f i) (← expr c) (← mapName k f p) (← mapName k f b)
+    | s => return s
+
+/-- the block with `f` applied to its `k`th list of statements (in the order of the lists'
+starts); the state counts the lists before -/
+partial def mapList (k : Nat) (f : List Statement → List Statement) :
+    Block → StateM Nat Block
+  | ⟨ss⟩ => do
+    let i ← modifyGet fun i => (i, i + 1)
+    let ss ← ss.mapM stmt
+    return ⟨if i == k then f ss else ss⟩
+where
+  stmt : Statement → StateM Nat Statement
+    | .Block b => return .Block (← mapList k f b)
+    | .FunctionDefinition g ps rs b => return .FunctionDefinition g ps rs (← mapList k f b)
+    | .If c b => return .If c (← mapList k f b)
+    | .ForLoop i c p b => return .ForLoop (← mapList k f i) c (← mapList k f p) (← mapList k f b)
+    | s => return s
+
+/-- a statement that often breaks a rule: with a name of `ns` (which can be in scope or not),
+the wrong number of values, or a literal that is too large -/
+def wrongStmt (ns : List Identifier) : Gen Statement := do
+  let n ← pick ns "x"
+  let arg : Gen Expression := return .Literal (.NumberLiteral 1)
+  match ← nat 0 9 with
+  | 0 => return .Break
+  | 1 => return .Continue
+  | 2 => return .Leave
+  | 3 => return .FunctionDefinition n (← list (← nat 0 1) (pick ns "x")) [] ⟨[]⟩
+  | 4 => return .VariableDeclaration [n] (some (← pick [.Identifier (← pick ns "x"),
+      .FunctionCall (← pick ns "x") [], .Literal (.NumberLiteral (2 ^ 256)),
+      .Literal (.StringLiteral (List.replicate 33 0x61))] (.Identifier "x")))
+  | 5 =>
+    if ← coin then return .Assignment (← list (← nat 1 2) (pick ns "x")) (← arg)
+    else return .Assignment [n, n] (.FunctionCall "verbatim_0i_2o" [str "c"])
+  | 6 => return .Expression (.FunctionCall n (← list (← nat 0 3) arg))
+  | 7 => return .Expression (.FunctionCall "verbatim_0i_0o" [.Literal (.StringLiteral [])])
+  | 8 => return .If (.FunctionCall n (← list (← nat 0 2) arg)) ⟨[]⟩
+  | _ => return .Expression (.FunctionCall "mstore"
+      [← arg, .FunctionCall (← pick ["datasize", "dataoffset"] "") [str (← pick ns "x")]])
+
+/-- the object with a random change to its code that can break a rule: a name replaced with
+another name of the code, a statement deleted, or a statement inserted -/
+def mutateObject (o : Object) : Gen Object := do
+  let ns := (blockNames o.code).map (·.1)
+  let lists := ((mapList 0 id o.code).run 0).2
+  let code ← match ← nat 0 2 with
+    | 0 =>
+      let n ← pick ns "x"
+      pure ((mapName (← nat 0 (ns.length - 1)) (fun _ => n) o.code).run' 0)
+    | 1 =>
+      let i ← nat 0 99
+      pure ((mapList (← nat 0 (lists - 1)) (fun ss => ss.eraseIdx (i % (ss.length + 1))) o.code)
+        |>.run' 0)
+    | _ =>
+      let i ← nat 0 99
+      -- with names that solc reserves
+      let s ← wrongStmt (ns ++ o.name :: allPaths o ++ ["sub", "jump", "verbatim", "verbatimx"])
+
+      pure ((mapList (← nat 0 (lists - 1)) (fun ss =>
+        ss.take (i % (ss.length + 1)) ++ s :: ss.drop (i % (ss.length + 1))) o.code).run' 0)
+  return { o with code }
 
 /-! ## Text -/
 

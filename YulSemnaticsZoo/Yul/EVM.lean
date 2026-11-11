@@ -50,6 +50,33 @@ def outs : Builtin → Nat
   | .Codecopy | .Extcodecopy | .Mstore | .Return | .Datacopy | .Setimmutable _ => 0
   | .Verbatim _ o _ => o
 
+/-- the name of the sub-object or data that a builtin refers to -/
+def dataName : Builtin → Option String
+  | .Dataoffset name | .Datasize name => some name
+  | _ => none
+
+/-- the instructions of the EVM in solc 0.8.33, without the ones that are only in EOF -/
+def instructions : List String :=
+  ["stop", "add", "sub", "mul", "div", "sdiv", "mod", "smod", "exp", "not", "lt", "gt", "slt",
+   "sgt", "eq", "iszero", "and", "or", "xor", "byte", "shl", "shr", "sar", "clz", "addmod",
+   "mulmod", "signextend", "keccak256", "address", "balance", "origin", "caller", "callvalue",
+   "calldataload", "calldatasize", "calldatacopy", "codesize", "codecopy", "gasprice",
+   "extcodesize", "extcodecopy", "returndatasize", "returndatacopy", "mcopy", "extcodehash",
+   "blockhash", "blobhash", "coinbase", "timestamp", "number", "difficulty", "prevrandao",
+   "gaslimit", "chainid", "selfbalance", "basefee", "blobbasefee", "pop", "mload", "mstore",
+   "mstore8", "sload", "sstore", "tload", "tstore", "jump", "jumpi", "pc", "msize", "gas",
+   "jumpdest", "log0", "log1", "log2", "log3", "log4", "create", "call", "callcode",
+   "staticcall", "return", "delegatecall", "create2", "revert", "invalid", "selfdestruct"] ++
+  (List.range 33).map (s!"push{·}") ++ (List.range 16).map (s!"dup{· + 1}") ++
+  (List.range 16).map (s!"swap{· + 1}")
+
+/-- the names that solc 0.8.33 does not let a declaration use: the instructions, the object
+builtins, and each name that starts with {lit}`verbatim` -/
+def reserved (x : Identifier) : Bool :=
+  x.startsWith "verbatim" || instructions.contains x ||
+    ["linkersymbol", "datasize", "dataoffset", "datacopy", "setimmutable", "loadimmutable",
+     "memoryguard"].contains x
+
 /-- a builtin with {name}`k` arguments, none of them literals -/
 def plain (k : Nat) (b : Builtin) : Option (List Arg × (List Literal → Option Builtin)) :=
   some (List.replicate k .Expression, fun _ => some b)
@@ -64,9 +91,9 @@ def size? : List Literal → Option (BitVec 256)
   | [.NumberLiteral k] => if k < 2 ^ 256 then some (BitVec.ofNat 256 k) else none
   | _ => none
 
-/-- the code in a string literal -/
+/-- the code in a string literal, which is not empty (as in solc) -/
 def code? : List Literal → Option (List UInt8)
-  | [.StringLiteral s] => some s
+  | [.StringLiteral s@(_ :: _)] => some s
   | _ => none
 
 /-- a decimal number of verbatim slots: `[1-9]?[0-9]` in solc -/
@@ -109,5 +136,7 @@ def dialect : Dialect where
   Builtin := Builtin
   outs := outs
   builtin := builtin
+  dataName := dataName
+  reserved := reserved
 
 end Yul.EVM

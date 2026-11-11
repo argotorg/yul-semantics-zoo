@@ -53,4 +53,8 @@ observed from within a call.
 So far the repo contains syntax for the Yul and EVM subsets we are interested
 in specifying here. Round trip theorems are proved for the printer / parser
 pairs for both Yul and the EVM. Both parsers are fuzzed against solc.
+
+The Yul syntax additionally defines a {lean}`Yul.Object.WellFormed` relation that encodes
+the additional non structural restrictions on the grammar. The Yul parser is
+proved to only ever produce well formed Yul.
 -/

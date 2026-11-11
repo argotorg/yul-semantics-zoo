@@ -1,5 +1,7 @@
 import YulSemnaticsZoo.Yul.Quote
 import YulSemnaticsZoo.Yul.Printer
+import YulSemnaticsZoo.Yul.WellFormed
+import YulSemnaticsZoo.Yul.EVM
 
 /-! `Yul.Object.parse_print` and the others prove that parsing printed text gives the AST. These
 tests are for the text that the printer does not print. -/
@@ -22,17 +24,19 @@ def result : Except String String → Option String
   fun s => result ((Statement.parse s).map (·.print)) == none
 
 -- where the docs grammar and solc 0.8.33 differ, as solc: only a call is an expression
--- statement, a decimal number has no leading zero, a declared name does not end with `.`, a
--- backslash before a new line in a string is no character, a hex literal can have one `_`
--- between two pairs of digits, and function parameters can end with a comma
-#guard ["x", "\"abc\"", "let x := 024", "let x := 00", "let x. := 1", "f(1,)", "let x := 1_000",
+-- statement, a decimal number has no leading zero, a declared name does not end with `.` and
+-- has no `..`, a backslash before a new line in a string is no character, a hex literal can
+-- have one `_` between two pairs of digits, and function parameters can end with a comma
+#guard ["x", "\"abc\"", "let x := 024", "let x := 00", "let x. := 1", "let x..y := 1",
+  "function f(a..b) {}", "f(1,)", "let x := 1_000",
   "let x := hex\"0_011\"", "let x := hex\"_0011\"", "let x := hex\"0011_\"",
   "let x := hex\"00__11\"",
   "function f(,) {}"].all fun s => result ((Statement.parse s).map (·.print)) == none
-#guard ["f()", "let x := 0", "let x := 0x00", "let x.y := 1", "x. := 1", "f.()",
+#guard ["f()", "let x := 0", "let x := 0x00", "let x.y := 1", "x. := 1", "x..y := 1", "f.()",
   "let s := \"a\\\nb\\\r\nc\\\rd\"", "let x := hex\"00_11_22\"",
   "function f(a,) {}"].map (fun s => result ((Statement.parse s).map (·.print))) ==
-  ["f()", "let x := 0", "let x := 0", "let x.y := 1", "x. := 1", "f.()", "let s := \"abcd\"",
+  ["f()", "let x := 0", "let x := 0", "let x.y := 1", "x. := 1", "x..y := 1", "f.()",
+   "let s := \"abcd\"",
    "let x := \"\\x00\\x11\\\"\"",
    "function f(a) { }"].map some
 
@@ -54,5 +58,13 @@ example : ([yul| { let x := add(1, 2) } |] : Block) =
 /-- error: Yul: expected an identifier, unexpected Yul.Token.Sym (Yul.Symbol.Assign) -/
 #guard_msgs in
 example : Statement := [yul| let := 1 |]
+
+def wellFormed (code : String) : Bool :=
+  (Object.parseWellFormed EVM.dialect s!"object \"A\" \{ code {code} }").toOption.isSome
+
+-- where the docs and solc 0.8.33 differ, as solc: a function can be in the body of a loop in the
+-- init block of a loop, but not in the init block
+#guard wellFormed "{ for { for {} 1 {} { function f() {} } } 1 {} {} }"
+#guard !wellFormed "{ for { function f() {} } 1 {} {} }"
 
 end Yul.Test

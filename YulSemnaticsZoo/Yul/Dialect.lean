@@ -26,5 +26,9 @@ structure Dialect where
   -- if `f` is the name of a builtin, its arguments, and the builtin for the values of its literal
   -- arguments (`none` if the values are not valid)
   builtin : Identifier → Option (List Arg × (List Literal → Option Builtin))
+  -- the name of the sub-object or data that a builtin refers to, as in `datasize("name")`
+  dataName : Builtin → Option String
+  -- names that a declaration cannot use, other than the names of builtins
+  reserved : Identifier → Bool
 
 end Yul

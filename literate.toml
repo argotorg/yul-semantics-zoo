@@ -21,6 +21,7 @@ order = [
   "YulSemnaticsZoo.Yul.Parser",
   "YulSemnaticsZoo.Yul.Valid",
   "YulSemnaticsZoo.Yul.Theorems",
+  "YulSemnaticsZoo.Yul.WellFormed",
   "YulSemnaticsZoo.Yul.Quote",
   "YulSemnaticsZoo.EVM.Syntax",
   "YulSemnaticsZoo.EVM.Printer",
@@ -72,6 +73,9 @@ title = "Yul: valid ASTs"
 
 [modules."YulSemnaticsZoo.Yul.Theorems"]
 title = "Yul: theorems"
+
+[modules."YulSemnaticsZoo.Yul.WellFormed"]
+title = "Yul: well-formed ASTs"
 
 [modules."YulSemnaticsZoo.Yul.Quote"]
 title = "Yul: quasiquoter"

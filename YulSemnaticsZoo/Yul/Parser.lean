@@ -14,7 +14,8 @@ After a word, the next token tells the statement: {lit}`(` starts a function cal
 {lit}`:=` an assignment.
 
 Where the grammar and solc 0.8.33 differ, it parses as solc: only a call is an expression
-statement, a declared name does not end with {lit}`.`, and function parameters can end with a comma.
+statement, a declared name does not end with {lit}`.` and has no {lit}`..`, and function parameters
+can end with a comma.
 -/
 
 namespace Yul
@@ -26,9 +27,10 @@ def keywords : List String :=
 /-- an identifier: a word that is not a keyword -/
 def validIdent (s : String) : Bool := isWord s && !keywords.contains s
 
-/-- a name that a declaration declares: an identifier that does not end with {lit}`.` (as in solc)
-  -/
-def validName (s : String) : Bool := validIdent s && s.toList.getLast? != some '.'
+/-- a name that a declaration declares: an identifier that does not end with {lit}`.` and has no
+{lit}`..` (as in solc) -/
+def validName (s : String) : Bool :=
+  validIdent s && (s.toList.getLast? != some '.' && (s.splitOn "..").length == 1)
 
 def describe : List Token → String
   | t :: _ => s!"unexpected {repr t}"
@@ -179,10 +181,12 @@ def parseStatement : Nat → List Token → Except String (Statement × List Tok
 
 end
 
+def asciiNameError : String := "an object or data name must be ASCII"
+
 /-- the string of the bytes of a string literal, which must be ASCII -/
 def asciiName (bs : List UInt8) : Except String String :=
   if bs.all (· < 128) then .ok (String.ofList (bs.map fun b => Char.ofNat b.toNat))
-  else .error "an object or data name must be ASCII"
+  else .error asciiNameError
 
 /-- the first error in the names of an object, as in solc: a name is empty, a child (an object or
 data in it) has the name of the object, or two children have one name -/
