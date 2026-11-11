@@ -8,9 +8,7 @@ code ({lit}`CREATE`), so programs are bytes, not {lit}`Instr`s. {lit}`Instr` is 
 decoded from those bytes.
 
 The instructions are a subset of the real EVM instructions, with the same opcode bytes and
-stack arguments, so a program of the tiny EVM is a program of the real EVM. There is no
-ether and no calldata: each balance is 0, and no instruction reads calldata, but {lit}`CALL` and
-{lit}`CREATE` take the {lit}`value` and calldata arguments of the real EVM.
+stack arguments, so a program of the tiny EVM is a program of the real EVM.
 -/
 
 namespace EVM
@@ -28,17 +26,17 @@ inductive Instr where
   | Jumpi
   | Gas
   | Jumpdest
-  /-- {lit}`Push`: {lit}`PUSHn`, with its immediate of {name}`n` bytes in big-endian order -/
+  -- `PUSHn`, with its immediate of `n` bytes in big-endian order
   | Push (n : Fin 33) (imm : Vector UInt8 n)
-  /-- {lit}`Dup`: {lit}`DUPn` -/
+  -- `DUPn`
   | Dup (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- {lit}`Swap`: {lit}`SWAPn` -/
+  -- `SWAPn`
   | Swap (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- {lit}`Create`: `CREATE(value, offset, size)` -/
+  -- `CREATE(value, offset, size)`
   | Create
-  /-- {lit}`Call`: `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  -- `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)`
   | Call
-  /-- {lit}`Return`: {lit}`RETURN(offset, size)` -/
+  -- `RETURN(offset, size)`
   | Return
   deriving DecidableEq, Repr
 
@@ -115,8 +113,7 @@ def decode (b : UInt8) (rest : List UInt8) : Option (Instr × List UInt8) :=
 def disassemble (bytes : List UInt8) : List (Option Instr) :=
   go bytes.length bytes
 where
-  /-- {name}`disassemble.go`: each step takes at least one byte, so `bytes.length` steps take all
-    bytes -/
+  -- each step takes at least one byte, so `bytes.length` steps take all bytes
   go : Nat → List UInt8 → List (Option Instr)
     | 0, _ | _, [] => []
     | k + 1, b :: rest =>

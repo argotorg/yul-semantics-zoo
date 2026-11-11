@@ -5,6 +5,8 @@ set_option doc.verso true
 
 The abstract syntax of Yul.
 
+## Core Syntax
+
 Reference: [The formal specification of Yul](https://docs.soliditylang.org/en/v0.8.38/yul.html#formal-specification)
 
 Differences from the specified grammar:
@@ -17,9 +19,12 @@ namespace Yul
 
 abbrev Identifier := String
 
+/-!
+Literals are numbers, strings, true or false
+-/
 inductive Literal where
   | NumberLiteral (n : Nat)
-  /-- {lit}`StringLiteral`: the bytes of the string, after escapes; also a `hex"…"` literal -/
+  -- the bytes of the string, after escapes; also a `hex"…"` literal
   | StringLiteral (bytes : List UInt8)
   | TrueLiteral
   | FalseLiteral
@@ -37,14 +42,14 @@ inductive Block where
 
 inductive Statement where
   | Block (b : Block)
-  /-- {lit}`FunctionDefinition`: `function name(params) -> rets body` -/
+  -- `function name(params) -> rets body`
   | FunctionDefinition (name : Identifier) (params rets : List Identifier) (body : Block)
-  /-- {lit}`VariableDeclaration`: {lit}`let vars := val`, or `let vars` -/
+  -- `let vars := val`, or `let vars`
   | VariableDeclaration (vars : List Identifier) (val : Option Expression)
   | Assignment (vars : List Identifier) (val : Expression)
   | If (cond : Expression) (body : Block)
   | Expression (e : Expression)
-  /-- {lit}`ForLoop`: `for init cond post body` -/
+  -- `for init cond post body`
   | ForLoop (init : Block) (cond : Expression) (post body : Block)
   | Break
   | Continue
@@ -52,12 +57,22 @@ inductive Statement where
 
 end
 
+/-!
+## Yul Objects
+
+Reference: [Specification of Yul Object](https://docs.soliditylang.org/en/v0.8.38/yul.html#specification-of-yul-object)
+
+Yul objects are used to group named code and data sections. The functions
+{lit}`datasize`, {lit}`dataoffset` and {lit}`datacopy` can be used to access these sections from
+within code. Hex strings can be used to specify data in hex encoding, regular
+strings in native encoding. For code, {lit}`datacopy` will access its assembled
+binary representation.
+-/
+
 structure Data where
   name : String
   value : List UInt8
 
-/-- A Yul object: code, the sub-objects it can deploy, and data. The code refers to sub-objects
-and data by name (in the EVM dialect: {lit}`dataoffset`, {lit}`datasize`). -/
 structure Object where
   name : String
   code : Block

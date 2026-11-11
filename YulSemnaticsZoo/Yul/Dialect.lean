@@ -12,19 +12,19 @@ The values of the literal arguments are part of the builtin.
 
 namespace Yul
 
-/-- an argument of a builtin: an expression, or a literal that is part of the builtin -/
+-- An argument of a builtin: an expression, or a literal that is part of the builtin
 inductive Arg where
   | Expression
   | Literal
   deriving DecidableEq, Repr
 
 structure Dialect where
-  /-- {lit}`Builtin`: a builtin, with the values of its literal arguments -/
+  -- a builtin, with the values of its literal arguments
   Builtin : Type
-  /-- {lit}`outs`: the number of values a builtin returns -/
+  -- the number of values a builtin returns
   outs : Builtin → Nat
-  /-- {lit}`builtin`: if {lit}`f` is the name of a builtin, its arguments, and the builtin for the
-  values of its literal arguments ({name}`none` if the values are not valid) -/
+  -- if `f` is the name of a builtin, its arguments, and the builtin for the values of its literal
+  -- arguments (`none` if the values are not valid)
   builtin : Identifier → Option (List Arg × (List Literal → Option Builtin))
 
 end Yul

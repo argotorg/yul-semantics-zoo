@@ -1,9 +1,9 @@
-/* Colours of Lean code in the literate document: Jellybeans (jellybeans.vim) in dark mode and
+/* Lean code in the literate document. Colours: Jellybeans (jellybeans.vim) in dark mode and
    Solarized (NeoSolarized) in light mode.
 
    Verso v4.35.0 sets the colour of code to black in both modes, its dark theme changes only the
    background of code boxes, and it has colours only for keywords, constants and variables, not
-   for literals and punctuation. */
+   for literals, punctuation and comments. */
 
 :root {
   --verso-code-box-background-color: #fdf6e3;
@@ -15,6 +15,7 @@
   --code-string-color: #2aa198;
   --code-number-color: #2aa198;
   --code-delim-color: #93a1a1;
+  --code-comment-color: #93a1a1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,9 +32,15 @@
     --code-string-color: #99ad6a;
     --code-number-color: #cf6a4c;
     --code-delim-color: #668799;
+    --code-comment-color: #888888;
   }
 }
 
 .hl.lean .token.literal.string { color: var(--code-string-color); }
 .hl.lean .token.literal.number, .hl.lean .token.literal.char { color: var(--code-number-color); }
 .hl.lean .token.punctuation, .hl.lean .token.delim { color: var(--code-delim-color); }
+.hl.lean .token.comment { color: var(--code-comment-color); font-style: italic; }
+
+/* Verso puts the declarations of a code box in one box without the blank lines between them:
+   space them as one blank line would */
+.code-box > code.hl.lean.block + code.hl.lean.block { margin-top: 1.7em; }

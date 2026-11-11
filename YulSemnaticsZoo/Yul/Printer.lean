@@ -40,7 +40,7 @@ def Token.chars : Token → List Char
 
 inductive Piece where
   | tok (t : Token)
-  /-- {lit}`line k`: a new line, then {name}`k` spaces -/
+  -- a new line, then `k` spaces
   | line (k : Nat)
 
 /-- a space between the tokens {lit}`t` and {lit}`u`: not after {lit}`(`, and not before {lit}`(`,

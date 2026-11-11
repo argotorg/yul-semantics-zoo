@@ -22,17 +22,17 @@ inductive Symbol where
   | LParen
   | RParen
   | Comma
-  /-- {lit}`Assign`: {lit}`:=` -/
+  -- `:=`
   | Assign
-  /-- {lit}`Arrow`: {lit}`->` -/
+  -- `->`
   | Arrow
   deriving DecidableEq, Repr
 
 inductive Token where
-  /-- {lit}`Word`: an identifier or a keyword -/
+  -- an identifier or a keyword
   | Word (s : String)
   | Number (n : Nat)
-  /-- {lit}`Str`: a string literal or a hex literal: its bytes -/
+  -- a string literal or a hex literal: its bytes
   | Str (bytes : List UInt8)
   | Sym (s : Symbol)
   deriving DecidableEq, Repr

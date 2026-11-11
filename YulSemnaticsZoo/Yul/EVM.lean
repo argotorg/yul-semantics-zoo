@@ -19,31 +19,28 @@ inductive Builtin where
   | Mload
   | Mstore
   | Gas
-  /-- {lit}`Create`: `create(value, offset, size)` -/
+  -- `create(value, offset, size)`
   | Create
-  /-- {lit}`Call`: `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  -- `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)`
   | Call
-  /-- {lit}`Return`: {lit}`return(offset, size)` -/
+  -- `return(offset, size)`
   | Return
-  /-- {lit}`Dataoffset`: {lit}`dataoffset("name")`: the offset of a sub-object or data in the code
-    -/
+  -- `dataoffset("name")`: the offset of a sub-object or data in the code
   | Dataoffset (name : String)
-  /-- {lit}`Datasize`: {lit}`datasize("name")`: the size of a sub-object or data -/
+  -- `datasize("name")`: the size of a sub-object or data
   | Datasize (name : String)
-  /-- {lit}`Datacopy`: `datacopy(to, offset, size)` -/
+  -- `datacopy(to, offset, size)`
   | Datacopy
-  /-- {lit}`Setimmutable`: `setimmutable(offset, "name", value)`: write {lit}`value` to memory at
-  {lit}`offset` at each place where the runtime code at {lit}`offset` reads immutable {lit}`name` -/
+  -- `setimmutable(offset, "name", value)`: write `value` to memory at `offset` at each place where
+  -- the runtime code at `offset` reads immutable `name`
   | Setimmutable (name : String)
-  /-- {lit}`Loadimmutable`: {lit}`loadimmutable("name")` -/
+  -- `loadimmutable("name")`
   | Loadimmutable (name : String)
-  /-- {lit}`Linkersymbol`: {lit}`linkersymbol("id")`: the address of library {lit}`id`, set by the
-    linker -/
+  -- `linkersymbol("id")`: the address of library `id`, set by the linker
   | Linkersymbol (id : String)
-  /-- {lit}`Memoryguard`: {lit}`memoryguard(size)` -/
+  -- `memoryguard(size)`
   | Memoryguard (size : BitVec 256)
-  /-- {lit}`Verbatim`: `verbatim_<ins>i_<outs>o("code", args)`: the bytes {lit}`code` in the output
-    -/
+  -- `verbatim_<ins>i_<outs>o("code", args)`: the bytes `code` in the output
   | Verbatim (ins outs : Nat) (code : List UInt8)
   deriving DecidableEq, Repr
 

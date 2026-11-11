@@ -4,43 +4,17 @@ This repository defines syntax and semantics for two cut down versions of both y
 goal is to explore which semantic styles are best suited for a compiler correctness theorem between
 yul and the evm.
 
-The defined syntax is for only the parts of the yul / evm execution model that are quirky or make
-defining a compiler correctness statement tricky.
+It is defined as a literate [verso](https://verso.lean-lang.org/) document. The `main` branch is
+published at [https://argotorg.github.io/yul-semantics-zoo].
 
-This means that in addition to the core basic control flow ops and data regions we define:
+## Developing
 
-- calls to the `gas()` opcode
-- divergence (infinite loops + recursion)
-- contract creation
-- calls to external code
-- code reads (both self and external)
-- load / set immutable
-- datacopy
-- data objects and data offsets
-- memoryguard
-- verbatim
-- library linking
+The tools come from the nix devshell: run `nix develop`, or `direnv allow` to use the `.envrc`. It
+has `elan` (and so Lean and Lake), `solc`, `geth` and `serve-docs`.
 
-## Design Goals
-
-The intention here is to gather evidence to support a choice of semantic style for yul and the evm
-that support the construction of a verified compiler. The design priorities are:
-
-1. completeness: we should be able to support compilation of the vast majority of existing solidity code
-2. auditability: the core trusted semantics and compiler correctness statement should simple and easy to audit and understand
-3. proof efficiency: the define semantics should support efficient and modular proofs about
-   compiler passes, reasoning should be local, and vertical modularity is of critical importance
-   (i.e. we should be able to insert, drop and reorder compiler passes without having to change our proofs).
-
-## What Does Compiler Correctness Mean
-
-When we compile a yul program to EVM we wish to preserve some of the semantics (e.g. control flow,
-variable assignment, return values, storage updates), while allowing modifications to others to
-allow for optimization (e.g. instruction order, gas costs, memory layouts, ...).
-
-At a very high level we generally wish to preserve most externally observable effects (modulo gas
-costs), while giving the compiler freedom to make changes to the program semantics that can only be
-observed from within a call.
-
-We probably want to allow ourselves to optimize an infinite loop into a revert, but we must not be
-allowed to introduce new divergence, or transform divergence into a successful execution.
+- `lake build`: build the library and check its proofs.
+- `lake test`: check the proofs and tests, then fuzz the EVM encoding and the Yul parser against
+  `solc`. `lake test -- 1000 42` runs 1000 fuzz cases from seed 42. CI runs `lake --wfail test`,
+  which also fails on warnings.
+- `serve-docs`: build the literate document, serve it at http://localhost:8000, and rebuild and
+  reload it when a source changes. `lake query :literateHtml` only builds it and prints its path.

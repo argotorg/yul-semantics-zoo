@@ -6,26 +6,51 @@ set_option doc.verso true
 /-!
 # Yul semantics zoo
 
-This document defines a small Yul and a small EVM, and semantics for them in different styles.
-The goal is to find which style of semantics is best for a compiler correctness theorem from Yul
-to the EVM. The design priorities are:
+This repository defines syntax and semantics for two cut down versions of both yul and the evm. The
+goal is to explore which semantic styles are best suited for a compiler correctness theorem between
+yul and the evm.
 
-1. completeness: the compiler can compile most existing Solidity code;
-2. auditability: the trusted semantics and the correctness statement are simple to read and to
-   check;
-3. proof efficiency: proofs about compiler passes are local and modular, so passes can be added,
-   removed and reordered without changes to other proofs.
+The defined syntax is for only the parts of the yul / evm execution model that are quirky or make
+defining a compiler correctness statement tricky.
 
-The two languages have only the parts of Yul and the EVM that make semantics or a correctness
-statement hard: `gas()`, infinite loops and recursion, contract creation, calls to other code,
-reads of the own code and of other code, immutables, {lit}`datacopy`, data and its offsets,
-{lit}`memoryguard`, {lit}`verbatim`, and library linking. Each program of the small languages is a
-program of the real ones.
+This means that in addition to the core basic control flow ops and data regions we define:
 
-The document has two parts, _Yul_ and _EVM_: each defines the syntax of the language, how it
-is read and printed, and theorems about these.
+- calls to the `gas()` opcode
+- divergence (infinite loops + recursion)
+- contract creation
+- calls to external code
+- code reads (both self and external)
+- load / set immutable
+- datacopy
+- data objects and data offsets
+- memoryguard
+- verbatim
+- library linking
 
-## Semantics
+## Design Goals
 
-The semantics of Yul and of the EVM, in each style, are parts of this document still to come.
+The intention here is to gather evidence to support a choice of semantic style for yul and the evm
+that support the construction of a verified compiler. The design priorities are:
+
+1. completeness: we should be able to support compilation of the vast majority of existing solidity code
+2. auditability: the core trusted semantics and compiler correctness statement should simple and easy to audit and understand
+3. proof efficiency: the define semantics should support efficient and modular proofs about
+   compiler passes, reasoning should be local, and vertical modularity is of critical importance
+   (i.e. we should be able to insert, drop and reorder compiler passes without having to change our proofs).
+
+## What Does Compiler Correctness Mean
+
+When we compile a yul program to EVM we wish to preserve some of the semantics (e.g. control flow,
+variable assignment, return values, storage updates), while allowing modifications to others to
+allow for optimization (e.g. instruction order, gas costs, memory layouts, ...).
+
+At a very high level we generally wish to preserve most externally observable effects (modulo gas
+costs), while giving the compiler freedom to make changes to the program semantics that can only be
+observed from within a call.
+
+## Contents
+
+So far the repo contains syntax for the Yul and EVM subsets we are interested
+in specifying here. Round trip theorems are proved for the printer / parser
+pairs for both Yul and the EVM. Both parsers are fuzzed against solc.
 -/

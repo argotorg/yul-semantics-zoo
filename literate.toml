@@ -6,7 +6,7 @@ landing_page = "YulSemnaticsZoo"
 # the lemmas are long proof scripts; the theorems that they prove are in the Theorems modules
 exclude = ["YulSemnaticsZoo.Yul.Lemmas", "YulSemnaticsZoo.EVM.Lemmas"]
 
-hide_commands = ["import", "open", "namespace", "end"]
+hide_commands = ["import", "open", "namespace", "end", "set_option"]
 
 # the reading order; `order` applies to each level (`order_children` with keys like
 # "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0)
@@ -30,8 +30,8 @@ order = [
 # docstrings are prose: show them as text between the code boxes
 docstrings_as_text = true
 
-# colours of code: Jellybeans in dark mode, Solarized in light mode
-extra_css = ["doc/code-colours.css"]
+# code: colours (Jellybeans in dark mode, Solarized in light mode) and space between declarations
+extra_css = ["doc/code.css"]
 
 [[targets]]
 library = "YulSemnaticsZoo"
