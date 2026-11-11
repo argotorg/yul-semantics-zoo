@@ -1,5 +1,7 @@
 import YulSemnaticsZoo.EVM.Syntax
 
+set_option doc.verso true
+
 /-!
 # EVM: lemmas about encoding and decoding
 -/
@@ -33,7 +35,7 @@ theorem decode_opcode_immediate (i : Instr) (rest : List UInt8) :
     simp; omega
   | _ => simp [decode, opcode, immediate, ofByte]
 
-/-- with enough steps, `disassemble.go` decodes each encoded instruction -/
+/-- with enough steps, {name}`disassemble.go` decodes each encoded instruction -/
 theorem disassemble_go_encode (l : List Instr) (k : Nat) (h : (l.flatMap encode).length ≤ k) :
     disassemble.go k (l.flatMap encode) = l.map some := by
   induction l generalizing k with

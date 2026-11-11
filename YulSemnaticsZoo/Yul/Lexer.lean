@@ -1,5 +1,7 @@
 import YulSemnaticsZoo.Yul.Syntax
 
+set_option doc.verso true
+
 /-!
 # Yul: lexer
 
@@ -8,8 +10,8 @@ sections of the solidity docs. The lexer also reads comments, `0x` numbers, `hex
 the escapes `\\ \" \' \n \r \t \xNN \uNNNN` in strings.
 
 Where the grammar and solc 0.8.33 differ, it reads as solc: a backslash before a new line in a
-string is no character, a hex literal can have one `_` between two pairs of digits, and a
-decimal number does not start with `0`.
+string is no character, a hex literal can have one {lit}`_` between two pairs of digits, and a
+decimal number does not start with {lit}`0`.
 -/
 
 namespace Yul
@@ -20,17 +22,17 @@ inductive Symbol where
   | LParen
   | RParen
   | Comma
-  /-- `Assign`: `:=` -/
+  /-- {lit}`Assign`: {lit}`:=` -/
   | Assign
-  /-- `Arrow`: `->` -/
+  /-- {lit}`Arrow`: {lit}`->` -/
   | Arrow
   deriving DecidableEq, Repr
 
 inductive Token where
-  /-- `Word`: an identifier or a keyword -/
+  /-- {lit}`Word`: an identifier or a keyword -/
   | Word (s : String)
   | Number (n : Nat)
-  /-- `Str`: a string literal or a hex literal: its bytes -/
+  /-- {lit}`Str`: a string literal or a hex literal: its bytes -/
   | Str (bytes : List UInt8)
   | Sym (s : Symbol)
   deriving DecidableEq, Repr
@@ -47,7 +49,8 @@ def isWord (s : String) : Bool :=
   | c :: cs => isIdentStart c && cs.all isIdentChar
   | [] => false
 
-/-- the longest start of `cs` whose characters satisfy `p`, and the characters after it -/
+/-- the longest start of {lit}`cs` whose characters satisfy {name}`p`, and the characters after it
+  -/
 def span (p : Char → Bool) : List Char → List Char × List Char
   | [] => ([], [])
   | c :: cs => if p c then ((span p cs).1.cons c, (span p cs).2) else ([], c :: cs)
@@ -59,7 +62,7 @@ def hexValue (c : Char) : Option Nat :=
   else if 'A' ≤ c ∧ c ≤ 'F' then some (c.toNat - 'A'.toNat + 10)
   else none
 
-/-- the value of digits in base `base` -/
+/-- the value of digits in base {name}`base` -/
 def digitsValue (base : Nat) (ds : List Char) : Option Nat :=
   ds.foldlM (fun v d => (hexValue d).bind fun k => if k < base then some (base * v + k) else none) 0
 
@@ -96,8 +99,9 @@ def lexString : List Char → Except String (List UInt8 × List Char)
       | [] => .error "a string literal has no end"
     else (lexString cs).map fun (bs, r) => (String.utf8EncodeChar c ++ bs, r)
 
-/-- the bytes of a hex literal after its opening quote `q`, and the characters after its
-closing quote; `sep`: one `_` can come next, since a pair of digits is before it (as in solc) -/
+/-- the bytes of a hex literal after its opening quote {name}`q`, and the characters after its
+closing quote; {name}`sep`: one {lit}`_` can come next, since a pair of digits is before it (as in
+solc) -/
 def lexHex (q : Char) (sep : Bool) : List Char → Except String (List UInt8 × List Char)
   | c :: cs =>
     if c = q then .ok ([], cs)
@@ -113,13 +117,13 @@ def lexHex (q : Char) (sep : Bool) : List Char → Except String (List UInt8 × 
       | [] => .error "a hex literal has no end"
   | [] => .error "a hex literal has no end"
 
-/-- `t` if the characters `r` after it do not continue it -/
+/-- {name}`t` if the characters {name}`r` after it do not continue it -/
 def ended (t : Token) (r : List Char) : Except String (Token × List Char) :=
   match r with
   | c :: _ => if isIdentChar c then .error s!"unexpected character {c}" else .ok (t, r)
   | [] => .ok (t, r)
 
-/-- the token at the start of `c :: cs`, and the characters after it -/
+/-- the token at the start of {lit}`c :: cs`, and the characters after it -/
 def lexToken (c : Char) (cs : List Char) : Except String (Token × List Char) :=
   if isIdentStart c then
     let (w, r) := span isIdentChar (c :: cs)
@@ -162,7 +166,7 @@ def dropBlockComment : List Char → Option (List Char)
   | _ :: cs => dropBlockComment cs
   | [] => none
 
-/-- the tokens of `cs`; each step takes at least one character, so `fuel = cs.length` is
+/-- the tokens of {lit}`cs`; each step takes at least one character, so {lit}`fuel = cs.length` is
 enough -/
 def lexWith : Nat → List Char → Except String (List Token)
   | _, [] => .ok []

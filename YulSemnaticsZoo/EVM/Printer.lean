@@ -1,9 +1,11 @@
 import YulSemnaticsZoo.EVM.Syntax
 
+set_option doc.verso true
+
 /-!
 # EVM: printer
 
-Text for bytes and instructions. An instruction prints as in `solc --opcodes`.
+Text for bytes and instructions. An instruction prints as in {lit}`solc --opcodes`.
 -/
 
 namespace EVM

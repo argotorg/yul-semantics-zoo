@@ -1,17 +1,20 @@
 import YulSemnaticsZoo.Yul.Lexer
 
+set_option doc.verso true
+
 /-!
 # Yul: parser
 
 Tokens to a Yul AST, by recursive descent. Each function takes fuel, which each nested call
 makes smaller. A call takes a token, or calls a function that takes one, at most two calls
-lower: `parseStatements`, `parseStatement`, `parseBlock`. So `3 * tokens + 1` is enough fuel.
+lower: {lit}`parseStatements`, {lit}`parseStatement`, {lit}`parseBlock`. So {lit}`3 * tokens + 1` is
+enough fuel.
 
-After a word, the next token tells the statement: `(` starts a function call, `,` or `:=` an
-assignment.
+After a word, the next token tells the statement: {lit}`(` starts a function call, {lit}`,` or
+{lit}`:=` an assignment.
 
 Where the grammar and solc 0.8.33 differ, it parses as solc: only a call is an expression
-statement, a declared name does not end with `.`, and function parameters can end with a comma.
+statement, a declared name does not end with {lit}`.`, and function parameters can end with a comma.
 -/
 
 namespace Yul
@@ -23,7 +26,8 @@ def keywords : List String :=
 /-- an identifier: a word that is not a keyword -/
 def validIdent (s : String) : Bool := isWord s && !keywords.contains s
 
-/-- a name that a declaration declares: an identifier that does not end with `.` (as in solc) -/
+/-- a name that a declaration declares: an identifier that does not end with {lit}`.` (as in solc)
+  -/
 def validName (s : String) : Bool := validIdent s && s.toList.getLast? != some '.'
 
 def describe : List Token → String
@@ -39,7 +43,7 @@ def parseName : List Token → Except String (Identifier × List Token)
   | .Word s :: r => if validName s then .ok (s, r) else .error s!"{s} is not a name"
   | ts => .error s!"expected a name, {describe ts}"
 
-/-- identifiers separated by commas, each satisfying `ok` -/
+/-- identifiers separated by commas, each satisfying {name}`ok` -/
 def parseIdents (ok : String → Bool) : List Token → Except String (List Identifier × List Token)
   | .Word s :: r =>
     if ok s then match r with
@@ -48,8 +52,8 @@ def parseIdents (ok : String → Bool) : List Token → Except String (List Iden
     else .error s!"{s} is not an identifier"
   | ts => .error s!"expected an identifier, {describe ts}"
 
-/-- identifiers separated by commas, maybe with a comma after the last (as in solc), and the `)`
-after them -/
+/-- identifiers separated by commas, maybe with a comma after the last (as in solc), and the
+{lit}`)` after them -/
 def parseParamList : List Token → Except String (List Identifier × List Token)
   | .Word s :: r =>
     if validName s then match r with
@@ -60,7 +64,7 @@ def parseParamList : List Token → Except String (List Identifier × List Token
     else .error s!"{s} is not an identifier"
   | ts => .error s!"expected an identifier, {describe ts}"
 
-/-- the parameters of a function after its `(`, and its `)` -/
+/-- the parameters of a function after its {lit}`(`, and its {lit}`)` -/
 def parseParams : List Token → Except String (List Identifier × List Token)
   | .Sym .RParen :: r => .ok ([], r)
   | ts => parseParamList ts
@@ -70,7 +74,7 @@ def exprStatement : Expression × List Token → Except String (Statement × Lis
   | (.FunctionCall f args, r) => .ok (.Expression (.FunctionCall f args), r)
   | _ => .error "expected a call or an assignment"
 
-/-- the return variables of a function: none, or `->` and identifiers -/
+/-- the return variables of a function: none, or {lit}`->` and identifiers -/
 def parseRets : List Token → Except String (List Identifier × List Token)
   | .Sym .Arrow :: r => parseIdents validName r
   | ts => .ok ([], ts)
@@ -92,7 +96,7 @@ def parseExpr : Nat → List Token → Except String (Expression × List Token)
       else .error s!"{s} is not an identifier"
     | .Sym _ => .error s!"expected an expression, {describe (t :: r)}"
 
-/-- the arguments of a call after its `(`, and its `)` -/
+/-- the arguments of a call after its {lit}`(`, and its {lit}`)` -/
 def parseArgs : Nat → List Token → Except String (List Expression × List Token)
   | 0, _ => .error "out of fuel"
   | n + 1, ts => match ts with
@@ -102,7 +106,7 @@ def parseArgs : Nat → List Token → Except String (List Expression × List To
       let (es, r) ← parseMoreArgs n r
       return (e :: es, r)
 
-/-- the arguments of a call after its first argument, and its `)` -/
+/-- the arguments of a call after its first argument, and its {lit}`)` -/
 def parseMoreArgs : Nat → List Token → Except String (List Expression × List Token)
   | 0, _ => .error "out of fuel"
   | n + 1, ts => match ts with
@@ -122,7 +126,7 @@ def parseBlock : Nat → List Token → Except String (Block × List Token)
   | n + 1, .Sym .LBrace :: r => (parseStatements n r).map fun (ss, r) => (⟨ss⟩, r)
   | _ + 1, ts => .error s!"expected a block, {describe ts}"
 
-/-- the statements of a block after its `{`, and its `}` -/
+/-- the statements of a block after its {lit}`{`, and its {lit}`}` -/
 def parseStatements : Nat → List Token → Except String (List Statement × List Token)
   | 0, _ => .error "out of fuel"
   | n + 1, ts => match ts with
@@ -202,7 +206,7 @@ def parseObject : Nat → List Token → Except String (Object × List Token)
     | none => return (⟨name, code, objects, data⟩, r)
   | _ + 1, ts => .error s!"expected object \"name\" \{ code, {describe ts}"
 
-/-- the objects and data of an object after its code, and its `}` -/
+/-- the objects and data of an object after its code, and its {lit}`}` -/
 def parseItems : Nat → List Token → Except String ((List Object × List Data) × List Token)
   | 0, _ => .error "out of fuel"
   | n + 1, ts => match ts with
@@ -218,7 +222,7 @@ def parseItems : Nat → List Token → Except String ((List Object × List Data
 
 end
 
-/-- parse all of `s` with `p` -/
+/-- parse all of {name}`s` with {name}`p` -/
 def parseAll (p : Nat → List Token → Except String (α × List Token)) (s : String) :
     Except String α := do
   let ts ← lex s.toList

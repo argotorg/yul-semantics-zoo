@@ -1,14 +1,16 @@
+set_option doc.verso true
+
 /-!
 # EVM: syntax
 
-EVM code is a list of bytes. Code can read code (`CODECOPY`, `EXTCODECOPY`) and create
-code (`CREATE`), so programs are bytes, not `Instr`s. `Instr` is an instruction decoded from
-those bytes.
+EVM code is a list of bytes. Code can read code ({lit}`CODECOPY`, {lit}`EXTCODECOPY`) and create
+code ({lit}`CREATE`), so programs are bytes, not {lit}`Instr`s. {lit}`Instr` is an instruction
+decoded from those bytes.
 
 The instructions are a subset of the real EVM instructions, with the same opcode bytes and
 stack arguments, so a program of the tiny EVM is a program of the real EVM. There is no
-ether and no calldata: each balance is 0, and no instruction reads calldata, but `CALL` and
-`CREATE` take the `value` and calldata arguments of the real EVM.
+ether and no calldata: each balance is 0, and no instruction reads calldata, but {lit}`CALL` and
+{lit}`CREATE` take the {lit}`value` and calldata arguments of the real EVM.
 -/
 
 namespace EVM
@@ -26,17 +28,17 @@ inductive Instr where
   | Jumpi
   | Gas
   | Jumpdest
-  /-- `Push`: `PUSHn`, with its immediate of `n` bytes in big-endian order -/
+  /-- {lit}`Push`: {lit}`PUSHn`, with its immediate of {name}`n` bytes in big-endian order -/
   | Push (n : Fin 33) (imm : Vector UInt8 n)
-  /-- `Dup`: `DUPn` -/
+  /-- {lit}`Dup`: {lit}`DUPn` -/
   | Dup (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- `Swap`: `SWAPn` -/
+  /-- {lit}`Swap`: {lit}`SWAPn` -/
   | Swap (n : Nat) (h : 0 < n ∧ n ≤ 16 := by omega)
-  /-- `Create`: `CREATE(value, offset, size)` -/
+  /-- {lit}`Create`: `CREATE(value, offset, size)` -/
   | Create
-  /-- `Call`: `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  /-- {lit}`Call`: `CALL(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
   | Call
-  /-- `Return`: `RETURN(offset, size)` -/
+  /-- {lit}`Return`: {lit}`RETURN(offset, size)` -/
   | Return
   deriving DecidableEq, Repr
 
@@ -91,29 +93,30 @@ def ofByte (b : UInt8) : Option Instr :=
     | 0xf3 => some Return
     | _ => none
 
-/-- the first `k` bytes, padded with zeros on the right if there are fewer -/
+/-- the first {name}`k` bytes, padded with zeros on the right if there are fewer -/
 def takeImmediate (k : Nat) (bytes : List UInt8) : Vector UInt8 k :=
   ⟨(bytes.take k ++ List.replicate (k - (bytes.take k).length) 0).toArray, by simp; omega⟩
 
-/-- `PUSHn` with its immediate taken from `rest`, and the bytes after the immediate -/
+/-- {lit}`PUSHn` with its immediate taken from {name}`rest`, and the bytes after the immediate -/
 def decodePush (n : Fin 33) (rest : List UInt8) : Instr × List UInt8 :=
   (Push n (takeImmediate n rest), rest.drop n)
 
 end Instr
 
 open Instr in
-/-- Decode the instruction with opcode `b` and the bytes `rest` after it. Gives the
-instruction and the bytes after it, or `none` if `b` is not a defined opcode. -/
+/-- Decode the instruction with opcode {name}`b` and the bytes {name}`rest` after it. Gives the
+instruction and the bytes after it, or {name}`none` if {name}`b` is not a defined opcode. -/
 def decode (b : UInt8) (rest : List UInt8) : Option (Instr × List UInt8) :=
   if h : 0x5f ≤ b.toNat ∧ b.toNat < 0x80 then
     some (decodePush ⟨b.toNat - 0x5f, by omega⟩ rest)
   else (ofByte b).map (·, rest)
 
-/-- the decoded instructions of `bytes`; `none` where a byte is not a defined opcode -/
+/-- the decoded instructions of {name}`bytes`; {name}`none` where a byte is not a defined opcode -/
 def disassemble (bytes : List UInt8) : List (Option Instr) :=
   go bytes.length bytes
 where
-  /-- `disassemble.go`: each step takes at least one byte, so `bytes.length` steps take all bytes -/
+  /-- {name}`disassemble.go`: each step takes at least one byte, so `bytes.length` steps take all
+    bytes -/
   go : Nat → List UInt8 → List (Option Instr)
     | 0, _ | _, [] => []
     | k + 1, b :: rest =>

@@ -1,11 +1,13 @@
 import YulSemnaticsZoo.Yul.Lemmas.Lexer
 import YulSemnaticsZoo.Yul.Valid
 
+set_option doc.verso true
+
 /-!
 # Yul: parsing printed tokens gives the AST
 
-For each part of a valid AST, parsing its printed tokens, then tokens `r` that do not continue
-it, gives the part and `r`, if the fuel is at least 3 for each token.
+For each part of a valid AST, parsing its printed tokens, then tokens {lit}`r` that do not continue
+it, gives the part and {lit}`r`, if the fuel is at least 3 for each token.
 -/
 
 namespace Yul
@@ -188,7 +190,7 @@ def stmtFollow (r : List Token) : Prop :=
 theorem block_head (b : Block) (k : Nat) : ∃ ts, tokens (b.pieces k) = .Sym .LBrace :: ts := by
   rcases b with ⟨_ | ⟨s, ss⟩⟩ <;> exact ⟨_, rfl⟩
 
-/-- the first printed token of a valid statement is `{` or not a symbol -/
+/-- the first printed token of a valid statement is {lit}`{` or not a symbol -/
 theorem stmt_head (s : Statement) (hv : s.valid = true) (k : Nat) :
     ∃ t ts, tokens (s.pieces k) = t :: ts ∧ (t = .Sym .LBrace ∨ ∀ x, t ≠ .Sym x) := by
   cases s with

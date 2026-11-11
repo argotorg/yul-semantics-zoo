@@ -1,5 +1,7 @@
 import YulSemnaticsZoo.EVM.Lemmas.Encode
 
+set_option doc.verso true
+
 /-!
 # EVM: theorems
 
@@ -47,7 +49,7 @@ theorem encode_decode_of_le {b : UInt8} {rest rest' : List UInt8} {i : Instr}
     i.encode ++ rest' = b :: rest := by
   simpa [Nat.sub_eq_zero_of_le hl] using encode_decode h
 
-/-- if the immediate is cut off, it is `rest` with zeros after it, and no bytes are left -/
+/-- if the immediate is cut off, it is {name}`rest` with zeros after it, and no bytes are left -/
 theorem decode_cut {b : UInt8} {rest rest' : List UInt8} {i : Instr}
     (h : decode b rest = some (i, rest')) (hl : rest.length < i.immediate.length) :
     i.immediate = rest ++ List.replicate (i.immediate.length - rest.length) 0 ∧ rest' = [] := by

@@ -1,13 +1,17 @@
 import Lean
 import YulSemnaticsZoo.Yul.Parser
 
+set_option doc.verso true
+
 /-!
 # Yul: quasiquoter
 
-`[yul| … |]` is Yul text, which `Yul.Expression.parse`, `Statement.parse`, `Block.parse` or
+`[yul| … |]` is Yul text, which {name}`Yul.Expression.parse`, `Statement.parse`, `Block.parse` or
 `Object.parse` parses when Lean elaborates it; the expected type tells which one.
 
-    def b : Yul.Block := [yul| { let x := add(1, 2) } |]
+```
+def b : Yul.Block := [yul| { let x := add(1, 2) } |]
+```
 -/
 
 namespace Yul

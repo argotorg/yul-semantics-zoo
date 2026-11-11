@@ -8,6 +8,8 @@ import YulSemnaticsZoo.Yul.Valid
 import YulSemnaticsZoo.Yul.Theorems
 import YulSemnaticsZoo.Yul.Quote
 
+set_option doc.verso true
+
 /-!
 # Yul
 
@@ -15,9 +17,9 @@ import YulSemnaticsZoo.Yul.Quote
   gives the builtins; the *EVM dialect* has the builtins of the small EVM and the builtins of
   solc for objects.
 - *Lexer*, *Printer* and *Parser*: between text and ASTs. Where the grammar in the docs and solc
-  0.8.33 differ, the parser follows solc. `lake test` fuzzes the parser against the parser of
+  0.8.33 differ, the parser follows solc. {lit}`lake test` fuzzes the parser against the parser of
   solc.
 - *Valid* and *Theorems*: parsing printed text gives the AST, for each AST that the grammar can
   express.
-- *Quote*: `[yul| … |]` is Yul text in Lean, parsed when Lean elaborates it.
+- *Quote*: {lit}`[yul| … |]` is Yul text in Lean, parsed when Lean elaborates it.
 -/

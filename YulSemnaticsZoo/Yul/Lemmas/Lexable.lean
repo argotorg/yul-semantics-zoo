@@ -1,6 +1,8 @@
 import YulSemnaticsZoo.Yul.Lemmas.Lexer
 import YulSemnaticsZoo.Yul.Valid
 
+set_option doc.verso true
+
 /-!
 # Yul: the printed words of a valid AST are words
 

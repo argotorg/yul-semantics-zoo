@@ -1,10 +1,12 @@
 import YulSemnaticsZoo.Yul.Dialect
 
+set_option doc.verso true
+
 /-!
 # Yul: the EVM dialect
 
 Builtins for the opcodes of the tiny EVM (see `EVM.Instr`), and the solc object builtins. The
-names, and the arguments that must be literals, are as in solc (`libyul/backends/evm`).
+names, and the arguments that must be literals, are as in solc ({lit}`libyul/backends/evm`).
 -/
 
 namespace Yul.EVM
@@ -17,28 +19,31 @@ inductive Builtin where
   | Mload
   | Mstore
   | Gas
-  /-- `Create`: `create(value, offset, size)` -/
+  /-- {lit}`Create`: `create(value, offset, size)` -/
   | Create
-  /-- `Call`: `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
+  /-- {lit}`Call`: `call(gas, addr, value, argsOffset, argsSize, retOffset, retSize)` -/
   | Call
-  /-- `Return`: `return(offset, size)` -/
+  /-- {lit}`Return`: {lit}`return(offset, size)` -/
   | Return
-  /-- `Dataoffset`: `dataoffset("name")`: the offset of a sub-object or data in the code -/
+  /-- {lit}`Dataoffset`: {lit}`dataoffset("name")`: the offset of a sub-object or data in the code
+    -/
   | Dataoffset (name : String)
-  /-- `Datasize`: `datasize("name")`: the size of a sub-object or data -/
+  /-- {lit}`Datasize`: {lit}`datasize("name")`: the size of a sub-object or data -/
   | Datasize (name : String)
-  /-- `Datacopy`: `datacopy(to, offset, size)` -/
+  /-- {lit}`Datacopy`: `datacopy(to, offset, size)` -/
   | Datacopy
-  /-- `Setimmutable`: `setimmutable(offset, "name", value)`: write `value` to memory at
-  `offset` at each place where the runtime code at `offset` reads immutable `name` -/
+  /-- {lit}`Setimmutable`: `setimmutable(offset, "name", value)`: write {lit}`value` to memory at
+  {lit}`offset` at each place where the runtime code at {lit}`offset` reads immutable {lit}`name` -/
   | Setimmutable (name : String)
-  /-- `Loadimmutable`: `loadimmutable("name")` -/
+  /-- {lit}`Loadimmutable`: {lit}`loadimmutable("name")` -/
   | Loadimmutable (name : String)
-  /-- `Linkersymbol`: `linkersymbol("id")`: the address of library `id`, set by the linker -/
+  /-- {lit}`Linkersymbol`: {lit}`linkersymbol("id")`: the address of library {lit}`id`, set by the
+    linker -/
   | Linkersymbol (id : String)
-  /-- `Memoryguard`: `memoryguard(size)` -/
+  /-- {lit}`Memoryguard`: {lit}`memoryguard(size)` -/
   | Memoryguard (size : BitVec 256)
-  /-- `Verbatim`: `verbatim_<ins>i_<outs>o("code", args)`: the bytes `code` in the output -/
+  /-- {lit}`Verbatim`: `verbatim_<ins>i_<outs>o("code", args)`: the bytes {lit}`code` in the output
+    -/
   | Verbatim (ins outs : Nat) (code : List UInt8)
   deriving DecidableEq, Repr
 
@@ -48,7 +53,7 @@ def outs : Builtin → Nat
   | .Codecopy | .Extcodecopy | .Mstore | .Return | .Datacopy | .Setimmutable _ => 0
   | .Verbatim _ o _ => o
 
-/-- a builtin with `k` arguments, none of them literals -/
+/-- a builtin with {name}`k` arguments, none of them literals -/
 def plain (k : Nat) (b : Builtin) : Option (List Arg × (List Literal → Option Builtin)) :=
   some (List.replicate k .Expression, fun _ => some b)
 

@@ -1,10 +1,12 @@
 import YulSemnaticsZoo.Yul.Lexer
 import YulSemnaticsZoo.Yul.Printer
 
+set_option doc.verso true
+
 /-!
 # Yul: lexing printed text gives the printed tokens
 
-`lex_print`: for pieces whose words the lexer can read as words, lexing the rendered text gives
+{lit}`lex_print`: for pieces whose words the lexer can read as words, lexing the rendered text gives
 the tokens of the pieces.
 -/
 
@@ -25,7 +27,7 @@ theorem utf8EncodeChar_ascii :
     ∀ n, n < 128 → String.utf8EncodeChar (Char.ofNat n) = [n.toUInt8] := by
   decide
 
-/-- the characters that `render` puts after a word or a number -/
+/-- the characters that {name}`render` puts after a word or a number -/
 def stopChars : List Char := [' ', '\n', '(', ')', ',']
 
 theorem stopChars_facts : ∀ c ∈ stopChars,
@@ -102,7 +104,7 @@ theorem decimal_single {n : Nat} {c : Char} (h : decimal n = [c]) : n < 10 := by
     rw [hd] at h
     simp at h
 
-/-- a printed decimal number of two or more digits does not start with `0` -/
+/-- a printed decimal number of two or more digits does not start with {lit}`0` -/
 theorem decimal_head (n : Nat) : ∀ c d ds, decimal n = c :: d :: ds → c ≠ '0' := by
   induction n using Nat.strongRecOn with
   | _ n ih =>
@@ -206,7 +208,8 @@ def Token.lexable : Token → Bool
   | .Word s => isWord s
   | _ => true
 
-/-- the characters `r` after the characters of `t` do not change how the lexer reads `t` -/
+/-- the characters {lit}`r` after the characters of {lit}`t` do not change how the lexer reads
+  {lit}`t` -/
 def Token.follows : Token → List Char → Prop
   | .Word _, r => ∀ c ∈ r.head?, c ∈ stopChars
   | .Number _, r => ∀ c ∈ r.head?, c ∈ stopChars

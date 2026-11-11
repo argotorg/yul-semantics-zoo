@@ -1,18 +1,16 @@
+set_option doc.verso true
+
 /-!
 # Yul: syntax
 
-The abstract syntax of Yul. The names are the names of the grammar in the "Specification of
-Yul" and "Specification of Yul Object" sections of the solidity docs. As in the grammar, the
-syntax is the same for all dialects: a call of a builtin is a `FunctionCall`.
+The abstract syntax of Yul.
 
-Differences from the grammar:
-- There is no `Switch`. It can be written with `VariableDeclaration` and `If`.
-- There are no types, as in the solc AST (`libyul/AST.h`): a `TypedIdentifierList` is a list
-  of `Identifier`s, and a `Literal` has no `TypeName`.
-- In an `Object`, the sub-objects and the `Data` are in two lists.
+Reference: [The formal specification of Yul](https://docs.soliditylang.org/en/v0.8.38/yul.html#formal-specification)
 
-Nothing is checked: the syntax can express unbound variables, a `Break` out of a loop, a
-builtin with a wrong number of arguments, and so on.
+Differences from the specified grammar:
+* There is no {lit}`Switch`.
+* There are no types : a {lit}`TypedIdentifierList` is a list of {lit}`Identifier`s, and a {lit}`Literal` has no {lit}`TypeName`.
+* In an {lit}`Object`, the sub-objects and the {lit}`Data` are in two lists.
 -/
 
 namespace Yul
@@ -21,7 +19,7 @@ abbrev Identifier := String
 
 inductive Literal where
   | NumberLiteral (n : Nat)
-  /-- `StringLiteral`: the bytes of the string, after escapes; also a `hex"…"` literal -/
+  /-- {lit}`StringLiteral`: the bytes of the string, after escapes; also a `hex"…"` literal -/
   | StringLiteral (bytes : List UInt8)
   | TrueLiteral
   | FalseLiteral
@@ -39,14 +37,14 @@ inductive Block where
 
 inductive Statement where
   | Block (b : Block)
-  /-- `FunctionDefinition`: `function name(params) -> rets body` -/
+  /-- {lit}`FunctionDefinition`: `function name(params) -> rets body` -/
   | FunctionDefinition (name : Identifier) (params rets : List Identifier) (body : Block)
-  /-- `VariableDeclaration`: `let vars := val`, or `let vars` -/
+  /-- {lit}`VariableDeclaration`: {lit}`let vars := val`, or `let vars` -/
   | VariableDeclaration (vars : List Identifier) (val : Option Expression)
   | Assignment (vars : List Identifier) (val : Expression)
   | If (cond : Expression) (body : Block)
   | Expression (e : Expression)
-  /-- `ForLoop`: `for init cond post body` -/
+  /-- {lit}`ForLoop`: `for init cond post body` -/
   | ForLoop (init : Block) (cond : Expression) (post body : Block)
   | Break
   | Continue
@@ -59,7 +57,7 @@ structure Data where
   value : List UInt8
 
 /-- A Yul object: code, the sub-objects it can deploy, and data. The code refers to sub-objects
-and data by name (in the EVM dialect: `dataoffset`, `datasize`). -/
+and data by name (in the EVM dialect: {lit}`dataoffset`, {lit}`datasize`). -/
 structure Object where
   name : String
   code : Block

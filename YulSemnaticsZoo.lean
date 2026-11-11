@@ -1,6 +1,8 @@
 import YulSemnaticsZoo.Yul
 import YulSemnaticsZoo.EVM
 
+set_option doc.verso true
+
 /-!
 # Yul semantics zoo
 
@@ -16,11 +18,11 @@ to the EVM. The design priorities are:
 
 The two languages have only the parts of Yul and the EVM that make semantics or a correctness
 statement hard: `gas()`, infinite loops and recursion, contract creation, calls to other code,
-reads of the own code and of other code, immutables, `datacopy`, data and its offsets,
-`memoryguard`, `verbatim`, and library linking. Each program of the small languages is a program of
-the real ones.
+reads of the own code and of other code, immutables, {lit}`datacopy`, data and its offsets,
+{lit}`memoryguard`, {lit}`verbatim`, and library linking. Each program of the small languages is a
+program of the real ones.
 
-The document has two parts, *Yul* and *EVM*: each defines the syntax of the language, how it
+The document has two parts, _Yul_ and _EVM_: each defines the syntax of the language, how it
 is read and printed, and theorems about these.
 
 ## Semantics

@@ -1,20 +1,22 @@
 import YulSemnaticsZoo.Yul.Lexer
 
+set_option doc.verso true
+
 /-!
 # Yul: printer
 
-The text of a Yul AST. The printer makes a list of tokens and new lines (`Piece`s); `render`
-puts a space between two tokens where the lexer could read them as one token (two words, or a
-word and a number), and also where it makes the text easier to read.
+The text of a Yul AST. The printer makes a list of tokens and new lines ({lit}`Piece`s);
+{lit}`render` puts a space between two tokens where the lexer could read them as one token (two
+words, or a word and a number), and also where it makes the text easier to read.
 -/
 
 namespace Yul
 
-/-- the digits of `n` in base 10 -/
+/-- the digits of {name}`n` in base 10 -/
 def decimal (n : Nat) : List Char :=
   if n < 10 then [Char.ofNat (48 + n)] else decimal (n / 10) ++ [Char.ofNat (48 + n % 10)]
 
-/-- the lower case hex digit of `k < 16` -/
+/-- the lower case hex digit of {lit}`k < 16` -/
 def hexDigit (k : Nat) : Char := if k < 10 then Char.ofNat (48 + k) else Char.ofNat (87 + k)
 
 /-- a byte in a string literal: printable ASCII as is, other bytes as `\xNN` -/
@@ -38,10 +40,11 @@ def Token.chars : Token → List Char
 
 inductive Piece where
   | tok (t : Token)
-  /-- `line k`: a new line, then `k` spaces -/
+  /-- {lit}`line k`: a new line, then {name}`k` spaces -/
   | line (k : Nat)
 
-/-- a space between the tokens `t` and `u`: not after `(`, and not before `(`, `)` or `,` -/
+/-- a space between the tokens {lit}`t` and {lit}`u`: not after {lit}`(`, and not before {lit}`(`,
+  {lit}`)` or {lit}`,` -/
 def gap : Token → Token → Bool
   | .Sym .LParen, _ => false
   | _, .Sym .LParen => false
@@ -49,7 +52,7 @@ def gap : Token → Token → Bool
   | _, .Sym .Comma => false
   | _, _ => true
 
-/-- the characters between the token `t` and the pieces `ps` after it -/
+/-- the characters between the token {name}`t` and the pieces {lit}`ps` after it -/
 def sepBefore (t : Token) : List Piece → List Char
   | .tok u :: _ => if gap t u then [' '] else []
   | _ => []
@@ -103,17 +106,17 @@ end
 
 mutual
 
-/-- a block whose `}` is at indent `k` -/
+/-- a block whose {lit}`}` is at indent {name}`k` -/
 def Block.pieces (k : Nat) : Block → List Piece
   | ⟨[]⟩ => [sym .LBrace, sym .RBrace]
   | ⟨s :: ss⟩ => sym .LBrace :: stmtsPieces (k + 2) (s :: ss) ++ [.line k, sym .RBrace]
 
-/-- statements, each on a new line at indent `k` -/
+/-- statements, each on a new line at indent {name}`k` -/
 def stmtsPieces (k : Nat) : List Statement → List Piece
   | [] => []
   | s :: ss => .line k :: s.pieces k ++ stmtsPieces k ss
 
-/-- a statement at indent `k` -/
+/-- a statement at indent {name}`k` -/
 def Statement.pieces (k : Nat) : Statement → List Piece
   | .Block b => b.pieces k
   | .FunctionDefinition f ps rs b =>
@@ -136,14 +139,14 @@ def Data.pieces (k : Nat) (d : Data) : List Piece :=
 
 mutual
 
-/-- an object whose `}` is at indent `k` -/
+/-- an object whose {lit}`}` is at indent {name}`k` -/
 def Object.pieces (k : Nat) : Object → List Piece
   | ⟨name, code, objects, data⟩ =>
     word "object" :: .tok (.Str (ascii name)) :: sym .LBrace :: .line (k + 2) :: word "code" ::
       code.pieces (k + 2) ++ objectsPieces (k + 2) objects ++ data.flatMap (Data.pieces (k + 2)) ++
       [.line k, sym .RBrace]
 
-/-- objects, each on a new line at indent `k` -/
+/-- objects, each on a new line at indent {name}`k` -/
 def objectsPieces (k : Nat) : List Object → List Piece
   | [] => []
   | o :: os => .line k :: o.pieces k ++ objectsPieces k os

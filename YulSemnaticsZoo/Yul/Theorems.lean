@@ -1,13 +1,15 @@
 import YulSemnaticsZoo.Yul.Lemmas.Parser
 import YulSemnaticsZoo.Yul.Lemmas.Lexable
 
+set_option doc.verso true
+
 /-!
 # Yul: theorems
 
-Parsing printed text gives the AST, for each valid AST (see `YulSemnaticsZoo/Yul/Valid.lean`).
+Parsing printed text gives the AST, for each valid AST (see {lit}`YulSemnaticsZoo/Yul/Valid.lean`).
 
-The proofs have two steps: lexing the printed text gives the printed tokens (`lex_print`), and
-parsing the tokens gives the AST (`parseObject_pieces` and the lemmas before it).
+The proofs have two steps: lexing the printed text gives the printed tokens ({lit}`lex_print`), and
+parsing the tokens gives the AST ({lit}`parseObject_pieces` and the lemmas before it).
 -/
 
 namespace Yul
