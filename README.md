@@ -31,3 +31,16 @@ that support the construction of a verified compiler. The design priorities are:
 3. proof efficiency: the define semantics should support efficient and modular proofs about
    compiler passes, reasoning should be local, and vertical modularity is of critical importance
    (i.e. we should be able to insert, drop and reorder compiler passes without having to change our proofs).
+
+## What Does Compiler Correctness Mean
+
+When we compile a yul program to EVM we wish to preserve some of the semantics (e.g. control flow,
+variable assignment, return values, storage updates), while allowing modifications to others to
+allow for optimization (e.g. instruction order, gas costs, memory layouts, ...).
+
+At a very high level we generally wish to preserve most externally observable effects (modulo gas
+costs), while giving the compiler freedom to make changes to the program semantics that can only be
+observed from within a call.
+
+We probably want to allow ourselves to optimize an infinite loop into a revert, but we must not be
+allowed to introduce new divergence, or transform divergence into a successful execution.
