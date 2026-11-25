@@ -8,6 +8,7 @@ exclude = [
   "YulSemnaticsZoo.Yul.Syntax.Lemmas",
   "YulSemnaticsZoo.Yul.Semantics.Clocked.Lemmas",
   "YulSemnaticsZoo.EVM.Syntax.Lemmas",
+  "YulSemnaticsZoo.Compiler.Lemmas",
 ]
 
 hide_commands = ["import", "open", "namespace", "end", "set_option"]
@@ -18,6 +19,7 @@ order = [
   "YulSemnaticsZoo.Yul",
   "YulSemnaticsZoo.EVM",
   "YulSemnaticsZoo.Semantics",
+  "YulSemnaticsZoo.Compiler",
   "YulSemnaticsZoo.Yul.Syntax",
   "YulSemnaticsZoo.Yul.Semantics",
   "YulSemnaticsZoo.Yul.Syntax.Syntax",
@@ -40,6 +42,8 @@ order = [
   "YulSemnaticsZoo.EVM.Semantics.Clocked.Step",
   "YulSemnaticsZoo.EVM.Semantics.Clocked.Gas",
   "YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement",
+  "YulSemnaticsZoo.Compiler.Compile",
+  "YulSemnaticsZoo.Compiler.Correct",
 ]
 
 # docstrings are prose: show them as text between the code boxes
@@ -120,3 +124,12 @@ title = "EVM: concrete gas"
 
 [modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement"]
 title = "EVM: the concrete run refines the abstract run"
+
+[modules."YulSemnaticsZoo.Compiler"]
+title = "Compiler"
+
+[modules."YulSemnaticsZoo.Compiler.Compile"]
+title = "Compiler: Yul to EVM"
+
+[modules."YulSemnaticsZoo.Compiler.Correct"]
+title = "Compiler: correctness"

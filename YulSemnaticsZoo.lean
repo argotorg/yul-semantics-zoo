@@ -1,6 +1,7 @@
 import YulSemnaticsZoo.Yul
 import YulSemnaticsZoo.EVM
 import YulSemnaticsZoo.Semantics
+import YulSemnaticsZoo.Compiler
 
 set_option doc.verso true
 
@@ -70,4 +71,9 @@ same result (obligation 3 of {lit}`doc/gas-equivalence.md`).
 {lit}`Yul.Clocked` is a clocked big-step semantics for Yul in the EVM dialect, with proofs of
 (Mono), (Det) and (Total). It defines 8 builtins; each other builtin halts the run with
 {lit}`unsupported`. It is fuzzed against solc and geth.
+
+The {lit}`Compiler` module has a compiler from this Yul to EVM bytecode, and a proof that the
+code has the behaviour of the object for each input and each readings
+({lit}`Compiler.compile_correct`). It is fuzzed against the Yul semantics, the abstract EVM and
+geth.
 -/

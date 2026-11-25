@@ -4,3 +4,4 @@ import Tests.Fuzz
 import Tests.Semantics
 import Tests.EVM
 import Tests.Clocked
+import Tests.Compiler
