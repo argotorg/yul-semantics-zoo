@@ -1,7 +1,7 @@
 import Lean.Data.Json
 import Fuzz.YulGen
-import YulSemnaticsZoo.Yul.WellFormed
-import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
+import YulSemnaticsZoo.Yul.Syntax.EVM
 
 /-!
 # Fuzzing the Yul parser against solc

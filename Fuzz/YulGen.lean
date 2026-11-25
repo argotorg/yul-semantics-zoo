@@ -1,6 +1,6 @@
 import Fuzz.Gen
-import YulSemnaticsZoo.Yul.Printer
-import YulSemnaticsZoo.Yul.WellFormed
+import YulSemnaticsZoo.Yul.Syntax.Printer
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
 
 /-!
 # Random Yul objects, and random text for them
@@ -11,7 +11,8 @@ arguments and results, `break` and `continue` are in a loop body, `leave` is in 
 `datasize` and `dataoffset` refer to sub-objects and data. `mutateObject` changes an object so
 that it can break one of these rules. `text` prints the tokens of an object with random
 spellings that the printer does not use: comments, white space, hex numbers, escapes and hex
-literals.
+literals. `subsetObject` makes objects that are well-formed in the EVM dialect and call only the
+8 builtins of the clocked semantics, for the fuzzer of the clocked semantics.
 -/
 
 namespace Fuzz.Yul
@@ -25,11 +26,19 @@ def fresh (p : String) : YGen String := modifyGet fun k => (p ++ toString k, k +
 /-- builtins of the EVM dialect with no literal arguments and one result: name and number of
 arguments -/
 def builtins1 : List (String × Nat) :=
-  [("add", 2), ("eq", 2), ("mload", 1), ("gas", 0), ("create", 3), ("call", 7)]
+  [("add", 2), ("lt", 2), ("eq", 2), ("calldataload", 1), ("mload", 1), ("gas", 0), ("create", 3),
+   ("call", 7)]
 
 /-- builtins of the EVM dialect with no literal arguments and no result -/
 def builtins0 : List (String × Nat) :=
   [("mstore", 2), ("codecopy", 3), ("extcodecopy", 4), ("return", 2), ("datacopy", 3)]
+
+/-- the builtins of the clocked semantics with one result -/
+def subset1 : List (String × Nat) :=
+  [("add", 2), ("lt", 2), ("eq", 2), ("calldataload", 1), ("mload", 1), ("gas", 0)]
+
+/-- the builtins of the clocked semantics with no result -/
+def subset0 : List (String × Nat) := [("mstore", 2), ("return", 2)]
 
 structure Env where
   /-- the variables in scope -/
@@ -40,6 +49,9 @@ structure Env where
   paths : List String := []
   inLoop : Bool := false
   inFun : Bool := false
+  /-- only the 8 builtins of the clocked semantics, and often small offsets and sizes for memory
+  and calldata, so that the runs stay small -/
+  subset : Bool := false
 
 instance : Inhabited Env := ⟨{}⟩
 instance : Inhabited Block := ⟨⟨[]⟩⟩
@@ -79,6 +91,16 @@ def literalCall (env : Env) (outs : Nat) (arg : Gen Expression) : Gen Expression
 
   | n => verbatim n arg
 
+/-- the `k` arguments of builtin `f`; in the subset, a memory offset or size or a calldata offset
+is often a number less than 65 -/
+def builtinArgs (env : Env) (f : String) (k : Nat) (arg : Gen Expression) :
+    Gen (List Expression) :=
+  (List.range k).mapM fun j => do
+    let small := f == "mload" || f == "calldataload" || f == "return" || (f == "mstore" && j == 0)
+    if env.subset && small then
+      if (← nat 0 3) > 0 then return .Literal (.NumberLiteral (← nat 0 64)) else arg
+    else arg
+
 /-- an expression with one value -/
 def expr (env : Env) : Nat → Gen Expression
   | 0 => leaf
@@ -86,18 +108,21 @@ def expr (env : Env) : Nat → Gen Expression
     match ← nat 0 4 with
     | 0 => leaf
     | 1 =>
-      let (f, k) ← pick builtins1 ("gas", 0)
-      return .FunctionCall f (← list k (expr env d))
+      let (f, k) ← pick (if env.subset then subset1 else builtins1) ("gas", 0)
+      return .FunctionCall f (← builtinArgs env f k (expr env d))
     | 2 =>
       match env.funs.filter (·.2.2 == 1) with
       | [] => leaf
       | fs =>
         let (f, k, _) ← pick fs ("", 0, 0)
         return .FunctionCall f (← list k (expr env d))
-    | 3 => literalCall env 1 (expr env d)
+    | 3 => if env.subset then leaf else literalCall env 1 (expr env d)
     | _ => leaf
 where
   leaf : Gen Expression := do
+    -- in the subset, `gas()` is often a leaf
+    if env.subset then
+      if (← nat 0 3) == 0 then return .FunctionCall "gas" []
     if !env.vars.isEmpty && (← coin) then return .Identifier (← pick env.vars "")
     else return .Literal (← literal)
 
@@ -107,10 +132,13 @@ def callStmt (env : Env) (d : Nat) : Gen Statement := do
   | 0, fs@(_ :: _) =>
     let (f, k, _) ← pick fs ("", 0, 0)
     return .Expression (.FunctionCall f (← list k (expr env d)))
-  | 1, _ => return .Expression (← literalCall env 0 (expr env d))
-  | _, _ =>
-    let (f, k) ← pick builtins0 ("return", 2)
-    return .Expression (.FunctionCall f (← list k (expr env d)))
+  | 1, _ => if env.subset then builtin else return .Expression (← literalCall env 0 (expr env d))
+  | _, _ => builtin
+where
+  builtin : Gen Statement := do
+    -- in the subset, `return` is less frequent, so that more of the code runs
+    let (f, k) ← pick (if env.subset then ("mstore", 2) :: subset0 else builtins0) ("return", 2)
+    return .Expression (.FunctionCall f (← builtinArgs env f k (expr env d)))
 
 mutual
 
@@ -153,8 +181,9 @@ partial def stmt (env : Env) (funs : Bool) (d : Nat) : YGen (Statement × Env) :
     | [] => return (← callStmt env (min d 2), env)
     | vs => return (.Assignment [← pick vs ""] (← e ()), env)
   | 2 =>
-    -- a call with more than one result: of a function, or of verbatim
-    let (call, n) ← match multi, ← coin with
+    -- a call with more than one result: of a function, or of verbatim (not in the subset)
+    if env.subset && multi.isEmpty then return (← callStmt env (min d 2), env)
+    let (call, n) ← match multi, (← coin) || env.subset with
       | fs@(_ :: _), true => do
         let (f, k, n) ← pick fs ("", 0, 0)
         pure (Expression.FunctionCall f (← list k (expr env (min d 2))), n)
@@ -206,6 +235,16 @@ partial def object (d : Nat) : YGen Object := do
   -- not the data of a sub-object: solc analyses `datasize("O.D")`, but it fails to assemble it
   -- (solidity issue 9470)
   return { o with code := ← block { paths := o.dataNames.filter (!(subData o).contains ·) } true 3 }
+
+/-- an object that is well-formed in the EVM dialect and calls only the 8 builtins of the clocked
+semantics; it has no sub-objects and no data, since only the code of the top object has a meaning
+there. Half of the objects end with a `return` of the first 128 bytes of memory. -/
+def subsetObject : YGen Object := do
+  let ⟨ss⟩ ← block { subset := true } true 3
+  let ret := Statement.Expression (.FunctionCall "return"
+    [.Literal (.NumberLiteral 0), .Literal (.NumberLiteral 128)])
+  let code := if ← coin then ss ++ [ret] else ss
+  return { name := "O", code := ⟨code⟩, objects := [], data := [] }
 
 
 /-! ## Mutations -/

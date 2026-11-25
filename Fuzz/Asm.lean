@@ -12,8 +12,8 @@ namespace Fuzz
 open EVM Instr
 
 def simple : List Instr :=
-  [.Stop, .Add, .Eq, .Codecopy, .Extcodecopy, .Pop, .Mload, .Mstore, .Jump, .Jumpi, .Gas,
-   .Jumpdest, .Create, .Call, .Return]
+  [.Stop, .Add, .Lt, .Eq, .Calldataload, .Codecopy, .Extcodecopy, .Pop, .Mload, .Mstore, .Jump,
+   .Jumpi, .Gas, .Jumpdest, .Create, .Call, .Return]
 
 /-- a random instruction; a push has its minimal width -/
 def instr : Gen Instr := do

@@ -4,28 +4,49 @@
 landing_page = "YulSemnaticsZoo"
 
 # the lemmas are long proof scripts; the theorems that they prove are in the Theorems modules
-exclude = ["YulSemnaticsZoo.Yul.Lemmas", "YulSemnaticsZoo.EVM.Lemmas"]
+exclude = [
+  "YulSemnaticsZoo.Yul.Syntax.Lemmas",
+  "YulSemnaticsZoo.Yul.Semantics.Clocked.Lemmas",
+  "YulSemnaticsZoo.Yul.Semantics.Clocked.Tactic",
+  "YulSemnaticsZoo.EVM.Syntax.Lemmas",
+  "YulSemnaticsZoo.Compiler.Lemmas",
+]
 
 hide_commands = ["import", "open", "namespace", "end", "set_option"]
 
 # the reading order; `order` applies to each level (`order_children` with keys like
-# "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0)
+# "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0). Each folder in the
+# order has a module (for example YulSemnaticsZoo/Yul/Syntax.lean): Verso warns for an ordered
+# name that is not a module.
 order = [
   "YulSemnaticsZoo.Yul",
   "YulSemnaticsZoo.EVM",
+  "YulSemnaticsZoo.Semantics",
+  "YulSemnaticsZoo.Compiler",
   "YulSemnaticsZoo.Yul.Syntax",
-  "YulSemnaticsZoo.Yul.Dialect",
-  "YulSemnaticsZoo.Yul.EVM",
-  "YulSemnaticsZoo.Yul.Lexer",
-  "YulSemnaticsZoo.Yul.Printer",
-  "YulSemnaticsZoo.Yul.Parser",
-  "YulSemnaticsZoo.Yul.Valid",
-  "YulSemnaticsZoo.Yul.Theorems",
-  "YulSemnaticsZoo.Yul.WellFormed",
-  "YulSemnaticsZoo.Yul.Quote",
+  "YulSemnaticsZoo.Yul.Semantics",
+  "YulSemnaticsZoo.Yul.Syntax.Syntax",
+  "YulSemnaticsZoo.Yul.Syntax.Dialect",
+  "YulSemnaticsZoo.Yul.Syntax.EVM",
+  "YulSemnaticsZoo.Yul.Syntax.Lexer",
+  "YulSemnaticsZoo.Yul.Syntax.Printer",
+  "YulSemnaticsZoo.Yul.Syntax.Parser",
+  "YulSemnaticsZoo.Yul.Syntax.Valid",
+  "YulSemnaticsZoo.Yul.Syntax.Theorems",
+  "YulSemnaticsZoo.Yul.Syntax.WellFormed",
+  "YulSemnaticsZoo.Yul.Syntax.Quote",
+  "YulSemnaticsZoo.Yul.Semantics.Clocked.Interp",
+  "YulSemnaticsZoo.Yul.Semantics.Clocked.Theorems",
   "YulSemnaticsZoo.EVM.Syntax",
-  "YulSemnaticsZoo.EVM.Printer",
-  "YulSemnaticsZoo.EVM.Theorems",
+  "YulSemnaticsZoo.EVM.Semantics",
+  "YulSemnaticsZoo.EVM.Syntax.Syntax",
+  "YulSemnaticsZoo.EVM.Syntax.Printer",
+  "YulSemnaticsZoo.EVM.Syntax.Theorems",
+  "YulSemnaticsZoo.EVM.Semantics.Clocked.Step",
+  "YulSemnaticsZoo.EVM.Semantics.Clocked.Gas",
+  "YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement",
+  "YulSemnaticsZoo.Compiler.Compile",
+  "YulSemnaticsZoo.Compiler.Correct",
 ]
 
 # docstrings are prose: show them as text between the code boxes
@@ -47,44 +68,83 @@ title = "Yul"
 [modules."YulSemnaticsZoo.EVM"]
 title = "EVM"
 
+[modules."YulSemnaticsZoo.Semantics"]
+title = "Semantics: shared definitions"
+
 [modules."YulSemnaticsZoo"]
 title = "Introduction"
 
 [modules."YulSemnaticsZoo.Yul.Syntax"]
-title = "Yul: syntax"
+title = "Syntax"
 
-[modules."YulSemnaticsZoo.Yul.Dialect"]
-title = "Yul: dialects"
-
-[modules."YulSemnaticsZoo.Yul.EVM"]
-title = "Yul: the EVM dialect"
-
-[modules."YulSemnaticsZoo.Yul.Lexer"]
-title = "Yul: lexer"
-
-[modules."YulSemnaticsZoo.Yul.Printer"]
-title = "Yul: printer"
-
-[modules."YulSemnaticsZoo.Yul.Parser"]
-title = "Yul: parser"
-
-[modules."YulSemnaticsZoo.Yul.Valid"]
-title = "Yul: valid ASTs"
-
-[modules."YulSemnaticsZoo.Yul.Theorems"]
-title = "Yul: theorems"
-
-[modules."YulSemnaticsZoo.Yul.WellFormed"]
-title = "Yul: well-formed ASTs"
-
-[modules."YulSemnaticsZoo.Yul.Quote"]
-title = "Yul: quasiquoter"
+[modules."YulSemnaticsZoo.Yul.Semantics"]
+title = "Semantics"
 
 [modules."YulSemnaticsZoo.EVM.Syntax"]
+title = "Syntax"
+
+[modules."YulSemnaticsZoo.EVM.Semantics"]
+title = "Semantics"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Syntax"]
+title = "Yul: syntax"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Dialect"]
+title = "Yul: dialects"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.EVM"]
+title = "Yul: the EVM dialect"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Lexer"]
+title = "Yul: lexer"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Printer"]
+title = "Yul: printer"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Parser"]
+title = "Yul: parser"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Valid"]
+title = "Yul: valid ASTs"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Theorems"]
+title = "Yul: theorems"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.WellFormed"]
+title = "Yul: well-formed ASTs"
+
+[modules."YulSemnaticsZoo.Yul.Syntax.Quote"]
+title = "Yul: quasiquoter"
+
+[modules."YulSemnaticsZoo.Yul.Semantics.Clocked.Interp"]
+title = "Yul: a clocked semantics"
+
+[modules."YulSemnaticsZoo.Yul.Semantics.Clocked.Theorems"]
+title = "Yul: theorems of the clocked semantics"
+
+[modules."YulSemnaticsZoo.EVM.Syntax.Syntax"]
 title = "EVM: syntax"
 
-[modules."YulSemnaticsZoo.EVM.Printer"]
+[modules."YulSemnaticsZoo.EVM.Syntax.Printer"]
 title = "EVM: printer"
 
-[modules."YulSemnaticsZoo.EVM.Theorems"]
+[modules."YulSemnaticsZoo.EVM.Syntax.Theorems"]
 title = "EVM: theorems"
+
+[modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Step"]
+title = "EVM: semantics"
+
+[modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Gas"]
+title = "EVM: concrete gas"
+
+[modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement"]
+title = "EVM: the concrete run refines the abstract run"
+
+[modules."YulSemnaticsZoo.Compiler"]
+title = "Compiler"
+
+[modules."YulSemnaticsZoo.Compiler.Compile"]
+title = "Compiler: Yul to EVM"
+
+[modules."YulSemnaticsZoo.Compiler.Correct"]
+title = "Compiler: correctness"

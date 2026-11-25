@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Printer
+import YulSemnaticsZoo.EVM.Syntax.Printer
 
 /-!
 # Fuzzing the EVM encoding against solc
@@ -27,8 +27,8 @@ def asmJson (instrs : List Instr) (data : List UInt8) : String :=
 
 /-- the names of the instructions in the tiny EVM -/
 def names : List String :=
-  ["STOP", "ADD", "EQ", "CODECOPY", "EXTCODECOPY", "POP", "MLOAD", "MSTORE", "JUMP", "JUMPI",
-   "GAS", "JUMPDEST", "CREATE", "CALL", "RETURN"]
+  ["STOP", "ADD", "LT", "EQ", "CALLDATALOAD", "CODECOPY", "EXTCODECOPY", "POP", "MLOAD", "MSTORE",
+   "JUMP", "JUMPI", "GAS", "JUMPDEST", "CREATE", "CALL", "RETURN"]
   ++ (List.range 33).map (s!"PUSH{·}")
   ++ (List.range 16).map (s!"DUP{· + 1}") ++ (List.range 16).map (s!"SWAP{· + 1}")
 
