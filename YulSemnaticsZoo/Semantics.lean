@@ -59,11 +59,12 @@ inductive Result where
   /-- a halt with no error ({lit}`STOP`, {lit}`RETURN`, or the end of the code), with the return
   data; {lit}`STOP` gives no data -/
   | ret (data : List UInt8)
-  /-- an exceptional halt of the EVM: a bad jump, a stack underflow or overflow, or an undefined
-  opcode -/
+  /-- an exceptional halt of the EVM: a bad jump, a stack underflow or overflow, or a byte that is
+  not an opcode of the real EVM -/
   | exception
   /-- an instruction or builtin that the semantics do not define: {lit}`CODECOPY`,
-  {lit}`EXTCODECOPY`, {lit}`CREATE` or {lit}`CALL` -/
+  {lit}`EXTCODECOPY`, {lit}`CREATE` or {lit}`CALL`, or an opcode of the real EVM that the tiny
+  EVM does not have, for example {lit}`SSTORE` -/
   | unsupported
   deriving DecidableEq, Repr
 
