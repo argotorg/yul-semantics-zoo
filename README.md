@@ -14,7 +14,7 @@ has `elan` (and so Lean and Lake), `solc`, `geth` and `serve-docs`.
 
 - `lake build`: build the library and check its proofs.
 - `lake test`: check the proofs and tests, then fuzz the EVM encoding and the Yul parser against
-  `solc`. `lake test -- 1000 42` runs 1000 fuzz cases from seed 42. CI runs `lake --wfail test`,
-  which also fails on warnings.
+  `solc`, and the clocked Yul semantics against `solc` and `evm` (geth). `lake test -- 1000 42`
+  runs 1000 fuzz cases from seed 42. CI runs `lake --wfail test`, which also fails on warnings.
 - `serve-docs`: build the literate document, serve it at http://localhost:8000, and rebuild and
   reload it when a source changes. `lake query :literateHtml` only builds it and prints its path.

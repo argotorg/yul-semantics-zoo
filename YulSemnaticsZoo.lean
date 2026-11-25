@@ -60,4 +60,7 @@ the additional non structural restrictions on the grammar.
 
 The {lit}`Semantics` module has the definitions that the Yul and EVM semantics both use: words,
 memory, the gas readings, and the results and behaviours of a run.
+
+{lit}`Yul.Clocked` is a clocked big-step semantics for a subset of Yul (the subset dialect), with
+proofs of (Mono), (Det) and (Total). It is fuzzed against solc and geth.
 -/
