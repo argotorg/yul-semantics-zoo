@@ -24,6 +24,9 @@ order = [
   "YulSemnaticsZoo.Yul.Theorems",
   "YulSemnaticsZoo.Yul.WellFormed",
   "YulSemnaticsZoo.Yul.Quote",
+  "YulSemnaticsZoo.Yul.Subset",
+  "YulSemnaticsZoo.Yul.Clocked",
+  "YulSemnaticsZoo.Yul.ClockedTheorems",
   "YulSemnaticsZoo.EVM.Syntax",
   "YulSemnaticsZoo.EVM.Printer",
   "YulSemnaticsZoo.EVM.Theorems",
@@ -85,6 +88,15 @@ title = "Yul: well-formed ASTs"
 
 [modules."YulSemnaticsZoo.Yul.Quote"]
 title = "Yul: quasiquoter"
+
+[modules."YulSemnaticsZoo.Yul.Subset"]
+title = "Yul: the subset dialect"
+
+[modules."YulSemnaticsZoo.Yul.Clocked"]
+title = "Yul: a clocked semantics"
+
+[modules."YulSemnaticsZoo.Yul.ClockedTheorems"]
+title = "Yul: theorems of the clocked semantics"
 
 [modules."YulSemnaticsZoo.EVM.Syntax"]
 title = "EVM: syntax"

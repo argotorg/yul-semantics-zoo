@@ -1,6 +1,7 @@
 import Fuzz.Solc
 import Fuzz.YulGen
 import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.Yul.Subset
 
 namespace Fuzz.Test
 open EVM Fuzz
@@ -24,5 +25,17 @@ def isBuiltin (outs : Nat) (f : String) (k : Nat) : Bool :=
 -- have
 #guard Yul.builtins1.all fun (f, k) => isBuiltin 1 f k
 #guard Yul.builtins0.all fun (f, k) => isBuiltin 0 f k
+
+/-- `f` is a builtin of the subset dialect with `k` arguments and `outs` results, as in the EVM
+dialect -/
+def isSubsetBuiltin (outs : Nat) (f : String) (k : Nat) : Bool :=
+  match Yul.Subset.builtin? f with
+  | some b => Yul.Subset.ins b == k && Yul.Subset.outs b == outs && isBuiltin outs f k
+  | none => false
+
+-- the clocked fuzzer calls each of the 8 builtins of the subset dialect, and no other builtin
+#guard Yul.subset1.all fun (f, k) => isSubsetBuiltin 1 f k
+#guard Yul.subset0.all fun (f, k) => isSubsetBuiltin 0 f k
+#guard (Yul.subset1 ++ Yul.subset0).length == 8
 
 end Fuzz.Test

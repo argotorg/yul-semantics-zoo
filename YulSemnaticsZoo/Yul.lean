@@ -8,6 +8,9 @@ import YulSemnaticsZoo.Yul.Valid
 import YulSemnaticsZoo.Yul.WellFormed
 import YulSemnaticsZoo.Yul.Theorems
 import YulSemnaticsZoo.Yul.Quote
+import YulSemnaticsZoo.Yul.Subset
+import YulSemnaticsZoo.Yul.Clocked
+import YulSemnaticsZoo.Yul.ClockedTheorems
 
 set_option doc.verso true
 
@@ -27,4 +30,9 @@ set_option doc.verso true
   parser {lit}`Object.parseWellFormed` gives only well-formed objects. {lit}`lake test` fuzzes
   {lit}`Object.WellFormed` in the EVM dialect against the analysis of solc.
 - *Quote*: {lit}`[yul| … |]` is Yul text in Lean, parsed when Lean elaborates it.
+- *Subset dialect*: the 8 builtins {lit}`add`, {lit}`lt`, {lit}`eq`, {lit}`calldataload`,
+  {lit}`mload`, {lit}`mstore`, {lit}`gas` and {lit}`return`.
+- *Clocked semantics*: a big-step interpreter for the subset dialect with a clock, and the
+  behaviours of a run. *Clocked theorems*: (Mono), (Det) and (Total). {lit}`lake test` fuzzes
+  the interpreter against solc and geth.
 -/
