@@ -23,8 +23,11 @@ generator (on by default; `stackAllocation: false` needs `yul: true`, here with 
 and the peephole optimizer of the assembly (it removes `GAS POP`). Then the later reads get other
 values. Thus the fuzzer turns both off.
 
-Cases where solc fails (for example, stack too deep) or geth goes out of gas or past its stack
-limit are skipped and counted.
+Cases where solc fails (for example, stack too deep) are skipped and counted. Cases where geth
+goes out of gas or past its stack limit of 1024 words are also skipped and counted: these are
+resource failures, {lit}`EVM.result_C` gives {lit}`none` for them, and the spec gives no statement
+about them. Yul has no limit on the depth of calls, thus a deep recursion in Yul can end or
+diverge where the bytecode has a stack overflow.
 -/
 
 namespace Fuzz.Clocked
@@ -131,6 +134,7 @@ def check (o : Object) (calldata : List UInt8) : IO (Except String Case) := do
     -- a memory offset or size with a cost that does not fit in 64 bits
     if ["out of gas", "gas uint64 overflow"].any fun s => (e.splitOn s).length > 1 then
       return .ok .outOfGas
+    -- a stack overflow: a resource failure, as out of gas
     if (e.splitOn "stack limit").length > 1 then return .ok .stackLimit
     return .error s!"geth fails: {e}\n{text}\ncalldata {EVM.hex calldata}"
   | .ok (.ok data gas) =>

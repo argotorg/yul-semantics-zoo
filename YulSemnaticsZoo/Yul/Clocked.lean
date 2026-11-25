@@ -319,8 +319,8 @@ As in the clocked interpreter row of the table in {lit}`doc/gas-equivalence.md`:
 {lit}`r` if some clock gives {lit}`r`, and it diverges if each clock gives a timeout.
 -/
 
-/-- {lit}`⟪P, i, ρ⟫ ⇝ b` ({lit}`P, i, ρ ⇝ b` in the spec): the run of the code of {name}`P` with
-input {name}`i` and readings {name}`ρ` has the behaviour {lit}`b` -/
+/-- {lit}`⟪P, i, ρ⟫ ⇝ b`: the run of the code of {name}`P` with input {name}`i` and readings
+{name}`ρ` has the behaviour {lit}`b` -/
 def Behaves (P : Object) (i : Input) (ρ : Readings) : Beh → Prop
   | .ends r => ∃ k, run P i ρ k = some r
   | .diverges => ∀ k, run P i ρ k = none

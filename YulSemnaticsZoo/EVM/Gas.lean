@@ -9,7 +9,8 @@ The concrete gas model: a gas counter with the real gas costs. The costs are the
 {lit}`evm run` of geth 1.17.10 with its default chain configuration (all forks to Osaka, and the
 next fork, that has {lit}`DUPN`, {lit}`SWAPN` and {lit}`EXCHANGE`). {lit}`lake test` fuzzes them
 against geth. The memory of {lit}`w` words costs {lit}`3 * w + w * w / 512`, and an instruction
-that expands the memory pays the difference.
+that expands the memory pays the difference. The stack has at most 1024 words, as in the real
+EVM.
 
 {lit}`GAS` pushes the remaining gas after the cost of {lit}`GAS`. Each instruction that does not
 halt costs at least 1 gas, thus the concrete run with gas {lit}`g` ends before the clock
@@ -54,18 +55,20 @@ structure Meter where
   reads : List Word
   deriving DecidableEq, Repr
 
-/-- the concrete gas model: the remaining gas, and a record of the reads -/
+/-- the concrete gas model: the remaining gas, a record of the reads, and the stack limit of the
+real EVM -/
 def concrete : GasModel Meter where
   charge i s m := if cost i s ≤ m.gas then some { m with gas := m.gas - cost i s } else none
   gas m :=
     let v := BitVec.ofNat 256 m.gas
     (v, { m with reads := m.reads ++ [v] })
+  stackLimit := some 1024
 
 /-- the concrete run of {name}`code` with input {name}`i` and gas {name}`g` -/
 def runC (code : List UInt8) (i : Input) (g : Nat) : Outcome Meter :=
   run concrete code i (g + 1) .init ⟨g, []⟩
 
-/-- the result of the concrete run, or {name}`none` if it goes out of gas -/
+/-- the result of the concrete run, or {name}`none` for a resource failure -/
 def result_C (code : List UInt8) (i : Input) (g : Nat) : Option Result :=
   match runC code i g with
   | .halt r _ => some r
@@ -75,7 +78,7 @@ def result_C (code : List UInt8) (i : Input) (g : Nat) : Option Result :=
 read -/
 def reads (code : List UInt8) (i : Input) (g : Nat) : Readings :=
   let l := match runC code i g with
-    | .halt _ m | .oog m => m.reads
+    | .halt _ m | .fail _ m => m.reads
     | .timeout => []
   fun n => l.getD n 0
 
@@ -111,7 +114,9 @@ theorem step_concrete_gas (h : step concrete code input s m = .next s' m') : m'.
     have hu := fetch_supported hf
     · split at h
       · simp at h
-      · simp only [concrete] at h
+      · simp only [concrete, Option.any, decide_eq_true_eq] at h
+        split at h
+        · simp at h
         split at h
         · simp at h
         · next m₁ hc =>

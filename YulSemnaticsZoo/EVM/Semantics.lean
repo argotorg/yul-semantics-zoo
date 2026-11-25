@@ -7,16 +7,17 @@ set_option doc.verso true
 # EVM: semantics
 
 A clocked interpreter. One step function {lit}`step` executes one instruction. It has a gas model
-as a parameter: the gas model charges the cost of each instruction and gives the value that
-{lit}`GAS` pushes. {lit}`run` repeats {lit}`step`, and its clock decreases by 1 at each
-instruction.
+as a parameter: the gas model charges the cost of each instruction, gives the value that
+{lit}`GAS` pushes, and has the stack limit. {lit}`run` repeats {lit}`step`, and its clock
+decreases by 1 at each instruction.
 
 There are two gas models:
 
-- The abstract model (this module) has no gas counter. The n-th {lit}`GAS` pushes {lit}`ρ n`.
-  It does not go out of gas. The relation {lit}`(code, i, ρ) ⇝ b` of
+- The abstract model (this module) has no gas counter and no stack limit. The n-th {lit}`GAS`
+  pushes {lit}`ρ n`. It has no resource failure. The relation {lit}`⟪code, i, ρ⟫ ⇝ b` of
   {lit}`doc/gas-equivalence.md` uses it.
-- The concrete model ({lit}`EVM.Gas`) has a gas counter and the real gas costs.
+- The concrete model ({lit}`EVM.Gas`) has a gas counter, the real gas costs and the stack limit
+  of 1024 words. Out of gas and a stack overflow are resource failures.
 -/
 
 namespace EVM
@@ -34,20 +35,30 @@ structure State where
 /-- the state at the start of a run -/
 def State.init : State := ⟨0, [], Memory.empty, 0⟩
 
-/-- the source of gas: it charges each instruction and gives the value that {lit}`GAS` pushes -/
+/-- the resources of a run: it charges each instruction, gives the value that {lit}`GAS` pushes,
+and limits the stack -/
 structure GasModel (S : Type) where
   /-- the gas state after the cost of the instruction in the state, or {name}`none` if the gas
   is not sufficient. The state is the state before the memory expansion of the instruction. -/
   charge : Instr → State → S → Option S
   /-- the value that {lit}`GAS` pushes, and the gas state after it -/
   gas : S → Word × S
+  /-- the largest number of words on the stack, or {name}`none` for no limit -/
+  stackLimit : Option Nat
+
+/-- a resource failure: the run needs more gas or more stack than the model has. The real EVM
+takes it as an exceptional halt that uses all the gas. -/
+inductive Failure where
+  | outOfGas
+  | stackOverflow
+  deriving DecidableEq, Repr
 
 /-- the result of one step -/
 inductive Step (S : Type) where
   | next (s : State) (g : S)
   | halt (r : Result) (g : S)
-  /-- out of gas -/
-  | oog
+  /-- a resource failure -/
+  | fail (f : Failure)
 
 /-- the positions of the {lit}`JUMPDEST`s of {name}`code`. A byte in the data of a push is not a
 {lit}`JUMPDEST`. -/
@@ -158,17 +169,19 @@ def exec (code : List UInt8) (input : Input) (i : Instr) (s : State) : Exec :=
   | _, _ => .halt .exception
 
 /-- One instruction: the instruction at the {lit}`pc` (or a halt for an unsupported or undefined
-opcode), then the stack check, then the gas, then the effect. This is the order of geth: a stack
-error comes before out of gas, and a bad jump after it. -/
+opcode), then the stack checks (underflow, then the stack limit of the model), then the gas, then
+the effect. This is the order of geth: a stack error comes before out of gas, and a bad jump after
+it. -/
 def step (m : GasModel S) (code : List UInt8) (input : Input) (s : State) (g : S) : Step S :=
   match fetch code s.pc with
   | .error r => .halt r g
   | .ok i =>
-    if s.stack.length < i.arity.1 ∨ 1024 < s.stack.length - i.arity.1 + i.arity.2 then
-      .halt .exception g
+    if s.stack.length < i.arity.1 then .halt .exception g
+    else if m.stackLimit.any (· < s.stack.length - i.arity.1 + i.arity.2) then
+      .fail .stackOverflow
     else
       match m.charge i s g with
-      | none => .oog
+      | none => .fail .outOfGas
       | some g =>
         match exec code input i { s with words := max s.words (i.memWords s.stack) } with
         | .next s => .next s g
@@ -179,13 +192,13 @@ def step (m : GasModel S) (code : List UInt8) (input : Input) (s : State) (g : S
 inductive Outcome (S : Type) where
   /-- a halt, with the gas state at the halt -/
   | halt (r : Result) (g : S)
-  /-- out of gas, with the gas state before the instruction that has no sufficient gas -/
-  | oog (g : S)
+  /-- a resource failure, with the gas state before the instruction that fails -/
+  | fail (f : Failure) (g : S)
   /-- the clock is 0 -/
   | timeout
   deriving DecidableEq, Repr
 
-/-- {name}`step` until a halt, out of gas, or the end of the clock {lit}`k`: each instruction
+/-- {name}`step` until a halt, a resource failure, or the end of the clock {lit}`k`: each instruction
 uses 1 of the clock -/
 def run (m : GasModel S) (code : List UInt8) (input : Input) : Nat → State → S → Outcome S
   | 0, _, _ => .timeout
@@ -193,7 +206,7 @@ def run (m : GasModel S) (code : List UInt8) (input : Input) : Nat → State →
     match step m code input s g with
     | .next s g => run m code input k s g
     | .halt r g => .halt r g
-    | .oog => .oog g
+    | .fail f => .fail f g
 
 /-- (Mono): if the clock {name}`k` gives an outcome that is not a timeout, then each larger clock
 gives the same outcome -/
@@ -210,28 +223,37 @@ theorem run_mono {m : GasModel S} {k k' : Nat} {s : State} {g : S}
     · rfl
     · rfl
 
-/-- The abstract gas model: the gas state is the number of reads. Each charge succeeds, and the
-n-th {lit}`GAS` pushes {lit}`ρ n`. -/
+/-- The abstract gas model: the gas state is the number of reads. Each charge succeeds, the n-th
+{lit}`GAS` pushes {lit}`ρ n`, and the stack has no limit. -/
 def abstract (ρ : Readings) : GasModel Nat where
   charge _ _ n := some n
   gas n := (ρ n, n + 1)
+  stackLimit := none
 
 /-- the abstract run of {name}`code` with input {name}`i`, readings {name}`ρ` and clock
 {name}`k` -/
 def runA (code : List UInt8) (i : Input) (ρ : Readings) (k : Nat) : Outcome Nat :=
   run (abstract ρ) code i k .init 0
 
-/-- {lit}`(code, i, ρ) ⇝ b`: the abstract run has the behaviour {lit}`b`. It ends with {lit}`r` if
+/-- {lit}`⟪code, i, ρ⟫ ⇝ b`: the abstract run has the behaviour {lit}`b`. It ends with {lit}`r` if
 a clock gives {lit}`r`, and it diverges if each clock gives a timeout. -/
 def Runs (code : List UInt8) (i : Input) (ρ : Readings) : Beh → Prop
   | .ends r => ∃ k n, runA code i ρ k = .halt r n
   | .diverges => ∀ k, runA code i ρ k = .timeout
 
-@[inherit_doc Runs] scoped syntax:50 "(" term ", " term ", " term ")" " ⇝ " term:51 : term
-macro_rules | `(($c, $i, $ρ) ⇝ $b) => `(Runs $c $i $ρ $b)
+@[inherit_doc] scoped notation:50 "⟪" c ", " i ", " ρ "⟫" " ⇝ " b:50 => Runs c i ρ b
 
-/-- the abstract model does not go out of gas -/
-theorem run_abstract_ne_oog : run (abstract ρ) code i k s n ≠ .oog n' := by
+/-- an abstract step has no resource failure: each charge succeeds, and the stack has no limit -/
+theorem step_abstract_ne_fail : step (abstract ρ) code i s n ≠ .fail f := by
+  simp only [step, abstract, Option.any, Bool.false_eq_true, ite_false]
+  split
+  · simp
+  · split
+    · simp
+    · cases exec code i _ _ <;> simp
+
+/-- the abstract model has no resource failure -/
+theorem run_abstract_ne_fail : run (abstract ρ) code i k s n ≠ .fail f n' := by
   induction k generalizing s n with
   | zero => simp [run]
   | succ k ih =>
@@ -239,13 +261,10 @@ theorem run_abstract_ne_oog : run (abstract ρ) code i k s n ≠ .oog n' := by
     split
     · exact ih
     · simp
-    · next hs =>
-      simp only [step, abstract] at hs
-      repeat' split at hs
-      all_goals simp at hs
+    · next hs => exact absurd hs step_abstract_ne_fail
 
 /-- (Det): a run has at most one behaviour -/
-theorem Runs.det (h : (code, i, ρ) ⇝ b) (h' : (code, i, ρ) ⇝ b') : b = b' := by
+theorem Runs.det (h : ⟪code, i, ρ⟫ ⇝ b) (h' : ⟪code, i, ρ⟫ ⇝ b') : b = b' := by
   cases b <;> cases b' <;> simp only [Runs] at h h'
   · obtain ⟨k, n, hk⟩ := h
     obtain ⟨k', n', hk'⟩ := h'
@@ -260,13 +279,13 @@ theorem Runs.det (h : (code, i, ρ) ⇝ b) (h' : (code, i, ρ) ⇝ b') : b = b' 
   · rfl
 
 /-- (Total): a run has a behaviour -/
-theorem Runs.total : ∃ b, (code, i, ρ) ⇝ b := by
+theorem Runs.total : ∃ b, ⟪code, i, ρ⟫ ⇝ b := by
   by_cases h : ∀ k, runA code i ρ k = .timeout
   · exact ⟨.diverges, h⟩
   · obtain ⟨k, hk⟩ := Classical.not_forall.mp h
     cases e : runA code i ρ k with
     | halt r n => exact ⟨.ends r, k, n, e⟩
-    | oog n => exact absurd e run_abstract_ne_oog
+    | fail f n => exact absurd e run_abstract_ne_fail
     | timeout => exact absurd e hk
 
 end EVM

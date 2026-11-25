@@ -7,9 +7,9 @@ import YulSemnaticsZoo.EVM.Printer
 # Fuzzing the concrete EVM semantics against geth
 
 Runs random bytecode (`Fuzz.Bytecode`) with random calldata and gas in `EVM.runC` and in
-`evm run --json` of geth, and compares the result (the return data, an exception, or out of gas),
-the value that each `GAS` pushes, and for a halt without error the remaining gas. `evm` must be on
-the path.
+`evm run --json` of geth, and compares the end of the run (the return data, an exception, or a
+resource failure: out of gas or a stack overflow), the value that each `GAS` pushes, and for a halt
+without error the remaining gas. `evm` must be on the path.
 
 The semantics stops at an unsupported instruction (`CODECOPY`, `EXTCODECOPY`, `CREATE`, `CALL`,
 or an opcode of the real EVM that the tiny EVM does not have), and geth executes it. Thus a case
@@ -21,10 +21,15 @@ defined.
 namespace Fuzz.Geth
 open EVM Semantics Lean
 
+/-- the end of a run: a result, or a resource failure -/
+inductive End where
+  | result (r : Result)
+  | fail (f : Failure)
+  deriving DecidableEq, Repr
+
 /-- a run as geth or the semantics gives it -/
 structure Run where
-  /-- {lit}`none` if out of gas -/
-  result : Option Result
+  result : End
   reads : List Nat
   /-- the remaining gas, only for a halt without error -/
   left : Option Nat
@@ -54,12 +59,13 @@ def bytesOfHex (s : String) : Option (List UInt8) :=
   go (digits s)
 
 /-- the result of geth for the error of the run -/
-def classify : Option String → List UInt8 → Except String (Option Result)
-  | none, out => .ok (some (.ret out))
+def classify : Option String → List UInt8 → Except String End
+  | none, out => .ok (.result (.ret out))
   | some e, _ =>
-    if e.startsWith "out of gas" || e == "gas uint64 overflow" then .ok none
-    else if ["stack underflow", "stack limit reached", "invalid jump destination",
-        "invalid opcode"].any (e.startsWith ·) then .ok (some .exception)
+    if e.startsWith "out of gas" || e == "gas uint64 overflow" then .ok (.fail .outOfGas)
+    else if e.startsWith "stack limit reached" then .ok (.fail .stackOverflow)
+    else if ["stack underflow", "invalid jump destination", "invalid opcode"].any (e.startsWith ·)
+    then .ok (.result .exception)
     else .error s!"unknown error of geth: {e}"
 
 def str (j : Json) (k : String) : Except String String := j.getObjValAs? String k
@@ -87,9 +93,9 @@ def ours (code : List UInt8) (i : Input) (g : Nat) : Except String (Option Run) 
   let reads (m : Meter) := m.reads.map (·.toNat)
   match runC code i g with
   | .halt .unsupported _ => .ok none
-  | .halt (.ret out) m => .ok (some ⟨some (.ret out), reads m, some m.gas⟩)
-  | .halt r m => .ok (some ⟨some r, reads m, none⟩)
-  | .oog m => .ok (some ⟨none, reads m, none⟩)
+  | .halt (.ret out) m => .ok (some ⟨.result (.ret out), reads m, some m.gas⟩)
+  | .halt r m => .ok (some ⟨.result r, reads m, none⟩)
+  | .fail f m => .ok (some ⟨.fail f, reads m, none⟩)
   | .timeout => .error "timeout"
 
 /-- the run of geth -/
@@ -145,6 +151,7 @@ structure Counts where
   ret := 0
   exception := 0
   oog := 0
+  stackOverflow := 0
   skipped := 0
   /-- the number of compared {lit}`GAS` values -/
   reads := 0
@@ -153,9 +160,10 @@ def Counts.add (c : Counts) : Outcome → Counts
   | .same r =>
     let c := { c with reads := c.reads + r.reads.length }
     match r.result with
-    | some (.ret _) => { c with ret := c.ret + 1 }
-    | some _ => { c with exception := c.exception + 1 }
-    | none => { c with oog := c.oog + 1 }
+    | .result (.ret _) => { c with ret := c.ret + 1 }
+    | .result _ => { c with exception := c.exception + 1 }
+    | .fail .outOfGas => { c with oog := c.oog + 1 }
+    | .fail .stackOverflow => { c with stackOverflow := c.stackOverflow + 1 }
   | .skip => { c with skipped := c.skipped + 1 }
 
 /-- check {name}`k` cases from {name}`g`: the counts, or the first difference and the number of
@@ -188,7 +196,7 @@ def fuzz (args : List String) : IO UInt32 := do
   | .error (i, err) => IO.eprintln s!"case {i}: {err}"; return 1
   | .ok c =>
     IO.println s!"no differences ({c.ret} return, {c.exception} exception, {c.oog} out of gas, \
-      {c.skipped} skipped: unsupported; {c.reads} GAS values)"
+      {c.stackOverflow} stack overflow, {c.skipped} skipped: unsupported; {c.reads} GAS values)"
     return if opcodes.isSome then 1 else 0
 
 end Fuzz.Geth
