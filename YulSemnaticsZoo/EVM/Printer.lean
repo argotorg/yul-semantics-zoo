@@ -25,7 +25,9 @@ namespace Instr
 def name : Instr → String
   | Stop => "STOP"
   | Add => "ADD"
+  | Lt => "LT"
   | Eq => "EQ"
+  | Calldataload => "CALLDATALOAD"
   | Codecopy => "CODECOPY"
   | Extcodecopy => "EXTCODECOPY"
   | Pop => "POP"

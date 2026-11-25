@@ -13,7 +13,9 @@ namespace Yul.EVM
 
 inductive Builtin where
   | Add
+  | Lt
   | Eq
+  | Calldataload
   | Codecopy
   | Extcodecopy
   | Mload
@@ -45,7 +47,7 @@ inductive Builtin where
   deriving DecidableEq, Repr
 
 def outs : Builtin → Nat
-  | .Add | .Eq | .Mload | .Gas | .Create | .Call
+  | .Add | .Lt | .Eq | .Calldataload | .Mload | .Gas | .Create | .Call
   | .Dataoffset _ | .Datasize _ | .Loadimmutable _ | .Linkersymbol _ | .Memoryguard _ => 1
   | .Codecopy | .Extcodecopy | .Mstore | .Return | .Datacopy | .Setimmutable _ => 0
   | .Verbatim _ o _ => o
@@ -112,7 +114,9 @@ def verbatim? (f : Identifier) : Option (Nat × Nat) :=
 
 def builtin : Identifier → Option (List Arg × (List Literal → Option Builtin))
   | "add" => plain 2 .Add
+  | "lt" => plain 2 .Lt
   | "eq" => plain 2 .Eq
+  | "calldataload" => plain 1 .Calldataload
   | "codecopy" => plain 3 .Codecopy
   | "extcodecopy" => plain 4 .Extcodecopy
   | "mload" => plain 1 .Mload

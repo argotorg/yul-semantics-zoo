@@ -13,6 +13,7 @@ hide_commands = ["import", "open", "namespace", "end", "set_option"]
 order = [
   "YulSemnaticsZoo.Yul",
   "YulSemnaticsZoo.EVM",
+  "YulSemnaticsZoo.Semantics",
   "YulSemnaticsZoo.Yul.Syntax",
   "YulSemnaticsZoo.Yul.Dialect",
   "YulSemnaticsZoo.Yul.EVM",
@@ -46,6 +47,9 @@ title = "Yul"
 
 [modules."YulSemnaticsZoo.EVM"]
 title = "EVM"
+
+[modules."YulSemnaticsZoo.Semantics"]
+title = "Semantics: shared definitions"
 
 [modules."YulSemnaticsZoo"]
 title = "Introduction"

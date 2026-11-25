@@ -16,7 +16,9 @@ namespace EVM
 inductive Instr where
   | Stop
   | Add
+  | Lt
   | Eq
+  | Calldataload
   | Codecopy
   | Extcodecopy
   | Pop
@@ -45,7 +47,9 @@ namespace Instr
 def opcode : Instr → UInt8
   | Stop => 0x00
   | Add => 0x01
+  | Lt => 0x10
   | Eq => 0x14
+  | Calldataload => 0x35
   | Codecopy => 0x39
   | Extcodecopy => 0x3c
   | Pop => 0x50
@@ -76,7 +80,9 @@ def ofByte (b : UInt8) : Option Instr :=
   else match b.toNat with
     | 0x00 => some Stop
     | 0x01 => some Add
+    | 0x10 => some Lt
     | 0x14 => some Eq
+    | 0x35 => some Calldataload
     | 0x39 => some Codecopy
     | 0x3c => some Extcodecopy
     | 0x50 => some Pop

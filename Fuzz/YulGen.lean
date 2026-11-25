@@ -25,7 +25,8 @@ def fresh (p : String) : YGen String := modifyGet fun k => (p ++ toString k, k +
 /-- builtins of the EVM dialect with no literal arguments and one result: name and number of
 arguments -/
 def builtins1 : List (String × Nat) :=
-  [("add", 2), ("eq", 2), ("mload", 1), ("gas", 0), ("create", 3), ("call", 7)]
+  [("add", 2), ("lt", 2), ("eq", 2), ("calldataload", 1), ("mload", 1), ("gas", 0), ("create", 3),
+   ("call", 7)]
 
 /-- builtins of the EVM dialect with no literal arguments and no result -/
 def builtins0 : List (String × Nat) :=

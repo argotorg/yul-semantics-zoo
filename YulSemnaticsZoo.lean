@@ -1,5 +1,6 @@
 import YulSemnaticsZoo.Yul
 import YulSemnaticsZoo.EVM
+import YulSemnaticsZoo.Semantics
 
 set_option doc.verso true
 
@@ -56,4 +57,7 @@ pairs for both Yul and the EVM. Both parsers are fuzzed against solc.
 
 The Yul syntax additionally defines a {lean}`Yul.Object.WellFormed` relation that encodes
 the additional non structural restrictions on the grammar.
+
+The {lit}`Semantics` module has the definitions that the Yul and EVM semantics both use: words,
+memory, the gas readings, and the results and behaviours of a run.
 -/
