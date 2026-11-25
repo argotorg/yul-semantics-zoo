@@ -63,7 +63,9 @@ memory, the gas readings, and the results and behaviours of a run.
 
 The EVM has a clocked semantics with two gas models: an abstract model, where the n-th
 {lit}`GAS` pushes {lit}`ρ n` and the stack has no limit, and a concrete model with the real gas
-costs and the stack limit of 1024 words. The concrete model is fuzzed against geth.
+costs and the stack limit of 1024 words. The concrete model is fuzzed against geth. If a
+concrete run halts, then the abstract run with the readings of the concrete run halts with the
+same result (obligation 3 of {lit}`doc/gas-equivalence.md`).
 
 {lit}`Yul.Clocked` is a clocked big-step semantics for Yul in the EVM dialect, with proofs of
 (Mono), (Det) and (Total). It defines 8 builtins; each other builtin halts the run with

@@ -39,6 +39,7 @@ order = [
   "YulSemnaticsZoo.EVM.Syntax.Theorems",
   "YulSemnaticsZoo.EVM.Semantics.Clocked.Step",
   "YulSemnaticsZoo.EVM.Semantics.Clocked.Gas",
+  "YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement",
 ]
 
 # docstrings are prose: show them as text between the code boxes
@@ -116,3 +117,6 @@ title = "EVM: semantics"
 
 [modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Gas"]
 title = "EVM: concrete gas"
+
+[modules."YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement"]
+title = "EVM: the concrete run refines the abstract run"
