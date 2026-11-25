@@ -60,4 +60,8 @@ the additional non structural restrictions on the grammar.
 
 The {lit}`Semantics` module has the definitions that the Yul and EVM semantics both use: words,
 memory, the gas readings, and the results and behaviours of a run.
+
+The EVM has a clocked semantics with two gas models: an abstract model, where the n-th
+{lit}`GAS` pushes {lit}`ρ n`, and a concrete model with the real gas costs. The concrete model
+is fuzzed against geth.
 -/

@@ -27,6 +27,8 @@ order = [
   "YulSemnaticsZoo.EVM.Syntax",
   "YulSemnaticsZoo.EVM.Printer",
   "YulSemnaticsZoo.EVM.Theorems",
+  "YulSemnaticsZoo.EVM.Semantics",
+  "YulSemnaticsZoo.EVM.Gas",
 ]
 
 # docstrings are prose: show them as text between the code boxes
@@ -92,3 +94,9 @@ title = "EVM: printer"
 
 [modules."YulSemnaticsZoo.EVM.Theorems"]
 title = "EVM: theorems"
+
+[modules."YulSemnaticsZoo.EVM.Semantics"]
+title = "EVM: semantics"
+
+[modules."YulSemnaticsZoo.EVM.Gas"]
+title = "EVM: concrete gas"
