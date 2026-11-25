@@ -94,14 +94,14 @@ P ≈ Q  :⇔  ∀ i ρ.  beh(P, i, ρ) = beh(Q, i, ρ)
 ## Proof obligations
 
 ```
-compile : Yul → EVM
+compile : Yul → Option EVM
 opt     : Yul → Yul
 ```
 
 1. **Compilation:**
 
    ```
-   ∀ i ρ.  beh(P, i, ρ) ≠ Ends(unsupported)  →  beh(compile(P), i, ρ) = beh(P, i, ρ)
+   compile(P) = some B  →  B ≈ P
    ```
 2. **Optimization:**
 
@@ -114,30 +114,60 @@ opt     : Yul → Yul
    result_C(B, i, g) = some r  →  beh(B, i, reads(B, i, g)) = Ends(r)
    ```
 
-Obligations 1 and 2 are `compile(P) ≈ P` and `opt(P) ≈ P` for only the runs of `P` that do not
-get to a builtin that the Yul semantics does not define. They give no statement about the other
-runs: there, the compiled code of the builtin need not halt with `unsupported` (for example,
-`datasize` compiles to a `PUSH`), and `opt` can remove a call of the builtin whose value is not
-used.
+Obligation 1 has no condition on the runs. `compile` gives `none` for each builtin that the Yul
+semantics does not define, also if no run gets to it. Thus `compile(P) = some B` only for a `P`
+that never halts with `unsupported`.
+
+Obligation 2 is `opt(P) ≈ P` for only the runs of `P` that do not get to a builtin that the Yul
+semantics does not define. It gives no statement about the other runs: there, `opt` can remove a
+call of the builtin whose value is not used.
+
+### Corollaries of obligation 1
+
+```
+(Congr)     P ≈ Q  ∧  compile(P) = some B  ∧  compile(Q) = some C  →  B ≈ C
+(Concrete)  compile(P) = some B  ∧  result_C(B, i, g) = some r
+                →  beh(P, i, reads(B, i, g)) = Ends(r)
+```
+
+(Congr) follows from obligation 1 for `P` and for `Q`, and from symmetry and transitivity of `≈`.
+(Concrete) follows from obligation 3 for `B` and obligation 1: `beh(P, ρ) = beh(B, ρ) = Ends(r)`.
 
 ## Corollary: Yul → abstract EVM → concrete EVM
 
 ```
-result_C(compile(opt(P)), i, g) = some r
+compile(opt(P)) = some B  ∧  result_C(B, i, g) = some r
     →  beh(P, i, ρ) = Ends(r)  ∨  beh(P, i, ρ) = Ends(unsupported)
-    where ρ = reads(compile(opt(P)), i, g)
+    where ρ = reads(B, i, g)
 ```
 
 Thus if `beh(P, i, ρ) ≠ Ends(unsupported)`, then `beh(P, i, ρ) = Ends(r)`. The second disjunct is
-necessary: if `P` halts with `unsupported`, obligations 1 and 2 permit each `r`.
+necessary because of obligation 2: if `P` halts with `unsupported`, `opt` can change the run, and
+`compile(opt(P))` can then give code. Obligation 1 alone does not need it: (Concrete) has no
+second disjunct.
 
-Proof: if `beh(P, i, ρ) = Ends(unsupported)`, the second disjunct is true. Else:
+Proof:
 
-1. Yul → Yul, by obligation 2: `beh(opt(P), i, ρ) = beh(P, i, ρ)`. Thus
-   `beh(opt(P), i, ρ) ≠ Ends(unsupported)`.
-2. Concrete EVM → abstract EVM, by obligation 3: `beh(compile(opt(P)), i, ρ) = Ends(r)`.
-3. Abstract EVM → Yul, by obligation 1 for `opt(P)`, with step 1: `beh(opt(P), i, ρ) = Ends(r)`.
-   With step 1, `beh(P, i, ρ) = Ends(r)`.
+1. Concrete EVM → abstract EVM, by obligation 3: `beh(B, i, ρ) = Ends(r)`.
+2. Abstract EVM → Yul, by obligation 1 for `opt(P)`: `beh(opt(P), i, ρ) = beh(B, i, ρ) = Ends(r)`.
+3. If `beh(P, i, ρ) = Ends(unsupported)`, the second disjunct is true. Else, Yul → Yul, by
+   obligation 2: `beh(P, i, ρ) = beh(opt(P), i, ρ) = Ends(r)`.
+
+## Status in Lean
+
+| Statement | Lean | Status |
+|---|---|---|
+| (Mono), (Det), (Total) for Yul | `Yul.Clocked.run_mono`, `det`, `total` | proven |
+| (Mono), (Det), (Total) for the abstract EVM | `EVM.run_mono`, `Runs.det`, `Runs.total` | proven |
+| Obligation 1 for `Compiler.compile` | `Compiler.compile_correct` | proven |
+| (Congr) | `Compiler.compile_congr` | proven |
+| (Concrete) | `Compiler.compile_concrete` | proven, with obligation 3 for `B` as a hypothesis |
+| Obligation 2 | none | the repository has no `opt` |
+| Obligation 3 | none | not proven in this branch; `Tests/EVM.lean` checks it on random code |
+| Corollary | none | follows from obligations 1, 2 and 3 |
+
+For the two EVM programs of (Congr), Lean writes `B ≈ₑ C` (`EVM.Equiv`): Lean has `≈` on lists
+already (the permutations). For an EVM program and a Yul object, it writes `Compiler.Equiv B P`.
 
 ## Semantic styles
 
