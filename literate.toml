@@ -7,6 +7,7 @@ landing_page = "YulSemnaticsZoo"
 exclude = [
   "YulSemnaticsZoo.Yul.Syntax.Lemmas",
   "YulSemnaticsZoo.Yul.Semantics.Clocked.Lemmas",
+  "YulSemnaticsZoo.Yul.Semantics.Clocked.Tactic",
   "YulSemnaticsZoo.EVM.Syntax.Lemmas",
   "YulSemnaticsZoo.Compiler.Lemmas",
 ]
@@ -14,7 +15,9 @@ exclude = [
 hide_commands = ["import", "open", "namespace", "end", "set_option"]
 
 # the reading order; `order` applies to each level (`order_children` with keys like
-# "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0)
+# "YulSemnaticsZoo.Yul" does not match nested modules in Verso v4.35.0). Each folder in the
+# order has a module (for example YulSemnaticsZoo/Yul/Syntax.lean): Verso warns for an ordered
+# name that is not a module.
 order = [
   "YulSemnaticsZoo.Yul",
   "YulSemnaticsZoo.EVM",
@@ -70,6 +73,18 @@ title = "Semantics: shared definitions"
 
 [modules."YulSemnaticsZoo"]
 title = "Introduction"
+
+[modules."YulSemnaticsZoo.Yul.Syntax"]
+title = "Syntax"
+
+[modules."YulSemnaticsZoo.Yul.Semantics"]
+title = "Semantics"
+
+[modules."YulSemnaticsZoo.EVM.Syntax"]
+title = "Syntax"
+
+[modules."YulSemnaticsZoo.EVM.Semantics"]
+title = "Semantics"
 
 [modules."YulSemnaticsZoo.Yul.Syntax.Syntax"]
 title = "Yul: syntax"

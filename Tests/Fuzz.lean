@@ -31,8 +31,13 @@ def isClockedBuiltin (outs : Nat) (f : String) (k : Nat) : Bool :=
   isBuiltin outs f k &&
     match Yul.EVM.dialect.builtin f with
     | some (_, mk) =>
-      (Yul.Clocked.builtin [] (fun _ => 0) (mk []) (List.replicate k 0) (Yul.Clocked.start 0)).val
-        != .halt .unsupported
+      match mk [] with
+      | some b =>
+        if h : (List.replicate k 0).length = Yul.EVM.ins b then
+          (Yul.Clocked.builtin [] (fun _ => 0) b (List.replicate k 0) h (Yul.Clocked.start 0)).val
+            != .halt .unsupported
+        else false
+      | none => false
     | none => false
 
 -- the clocked fuzzer calls each of the 8 builtins that the clocked semantics defines, and no

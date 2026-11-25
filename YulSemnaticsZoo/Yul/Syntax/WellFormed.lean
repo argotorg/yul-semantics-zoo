@@ -309,6 +309,10 @@ end
 
 instance {d : Dialect} {o : Object} : Decidable (o.WellFormed d) := Object.decWellFormed d o
 
+/-- the object with the proof that it is well-formed, or {lit}`none` -/
+def Object.checkWellFormed (d : Dialect) (o : Object) : Option { o : Object // o.WellFormed d } :=
+  if h : o.WellFormed d then some ⟨o, h⟩ else none
+
 /-- parse an object, and check that it is well-formed -/
 def Object.parseWellFormed (d : Dialect) (s : String) :
     Except String { o : Object // o.WellFormed d } := do

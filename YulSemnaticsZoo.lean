@@ -68,7 +68,8 @@ costs and the stack limit of 1024 words. The concrete model is fuzzed against ge
 concrete run halts, then the abstract run with the readings of the concrete run halts with the
 same result (obligation 3 of {lit}`doc/gas-equivalence.md`).
 
-{lit}`Yul.Clocked` is a clocked big-step semantics for Yul in the EVM dialect, with proofs of
+{lit}`Yul.Clocked` is a clocked big-step semantics for Yul objects that are well-formed in the
+EVM dialect, with proofs of
 (Mono), (Det) and (Total). It defines 8 builtins; each other builtin halts the run with
 {lit}`unsupported`. It is fuzzed against solc and geth.
 

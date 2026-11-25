@@ -49,12 +49,12 @@ macro "inv" h:ident : tactic => `(tactic| simp only [except_bind_ok, except_pure
 abbrev vals (vs : Vars) : List Word := vs.map (·.2)
 
 section
-variable (prog : Code) (inp : Input) (ρ : Readings)
+variable (prog : Code) (inp : Input) (ρ : Readings) (N : List String)
 
 /-- the function is compiled in the scope {name}`scope`, and its code is in the program -/
 def FunAt (scope : CFuns) (fn : Fun) (info : FunInfo) : Prop :=
   info.params = fn.params.length ∧ info.rets = fn.rets.length ∧
-  ∃ q, info.label = (q, 0) ∧ (fn.params ++ fn.rets).Nodup ∧
+  ∃ q, info.label = (q, 0) ∧
     ∃ cb c, compileBlock (funCtx scope q fn.params fn.rets) (q ++ [0]) fn.body = .ok cb ∧
       funCode q fn.params.length fn.rets.length cb = .ok c ∧ ∃ p, At prog p c
 
@@ -113,56 +113,71 @@ structure Pre (ctx : Ctx) (fs : Funs) (st : State) (s : EVM.State) (n : Nat) (re
   mem : s.mem = st.mem
   reads : n = st.reads
 
-/-! ## The motives -/
+/-! ## The motives
 
-def M1 (fs : Funs) (st : State) (s : Statement) : Prop :=
+One for each function of the interpreter, with its arguments. An expression has the number of
+values that the proof of well-formedness gives. -/
+
+def M1 (fs : Funs) (st : State) (Γ : Scope) (s : Statement) (h : s.WellFormed EVM.dialect N Γ)
+    (hI : Agrees N fs st.vars Γ) : Prop :=
   ∀ ctx q code vars', compileStmt ctx q s = .ok (code, vars') → ∀ p, At prog p code →
     ∀ s0 n rest, s0.pc = p → Pre prog ctx fs st s0 n rest →
       StmtPost prog inp ρ ctx s0 n st (p + size code) rest
-        ((exec inp ρ fs st s).val, (exec inp ρ fs st s).st) ∧
-      ((exec inp ρ fs st s).val = .normal → vars' = names (exec inp ρ fs st s).st.vars)
+        ((exec inp ρ N fs st Γ s h hI).val, (exec inp ρ N fs st Γ s h hI).st) ∧
+      ((exec inp ρ N fs st Γ s h hI).val = .normal →
+        vars' = names (exec inp ρ N fs st Γ s h hI).st.vars)
 
-def M2 (fs : Funs) (st : State) (c : Expression) (post body : Block) : Prop :=
-  ∀ ctx q cc cb cp, ctx.loop = none → compileExpr ctx (q ++ [1]) 0 c 1 = .ok cc →
+def M2 (fs : Funs) (st : State) (Γ : Scope) (c : Expression) (post body : Block)
+    (hc : c.WellFormed EVM.dialect N Γ 1)
+    (hb : body.WellFormed EVM.dialect N { Γ with inLoopBody := true })
+    (hp : post.WellFormed EVM.dialect N Γ) (hl : Γ.inLoopBody = false)
+    (hI : Agrees N fs st.vars Γ) : Prop :=
+  ∀ ctx q cc cb cp, ctx.loop = none → compileExpr ctx (q ++ [1]) 0 c = .ok cc →
     compileBlock { ctx with loop := some ((q, 2), (q, 1), ctx.vars.length) } (q ++ [2]) body =
       .ok cb →
     compileBlock ctx (q ++ [3]) post = .ok cp → ∀ p, At prog p (loopCode q cc cb cp) →
     ∀ s0 n rest, s0.pc = p → Pre prog ctx fs st s0 n rest →
       StmtPost prog inp ρ ctx s0 n st (p + size (loopCode q cc cb cp)) rest
-        ((loop inp ρ fs st c post body).val, (loop inp ρ fs st c post body).st)
+        ((loop inp ρ N fs st Γ c post body hc hb hp hl hI).val,
+          (loop inp ρ N fs st Γ c post body hc hb hp hl hI).st)
 
-def M3 (fs : Funs) (st : State) (b : Block) : Prop :=
+def M3 (fs : Funs) (st : State) (Γ : Scope) (b : Block) (h : b.WellFormed EVM.dialect N Γ)
+    (hI : Agrees N fs st.vars Γ) : Prop :=
   ∀ ctx q code, compileBlock ctx q b = .ok code → ∀ p, At prog p code →
     ∀ s0 n rest, s0.pc = p → Pre prog ctx fs st s0 n rest →
       StmtPost prog inp ρ ctx s0 n st (p + size code) rest
-        ((execBlock inp ρ fs st b).val, (execBlock inp ρ fs st b).st)
+        ((execBlock inp ρ N fs st Γ b h hI).val, (execBlock inp ρ N fs st Γ b h hI).st)
 
-def M4 (fs : Funs) (st : State) (ss : List Statement) : Prop :=
+def M4 (fs : Funs) (st : State) (Γ : Scope) (ss : List Statement)
+    (h : statementsWellFormed EVM.dialect N Γ ss) (hI : Agrees N fs st.vars Γ) : Prop :=
   ∀ ctx q j code vars', compileStmts ctx q j ss = .ok (code, vars') → ∀ p, At prog p code →
     ∀ s0 n rest, s0.pc = p → Pre prog ctx fs st s0 n rest →
       StmtPost prog inp ρ ctx s0 n st (p + size code) rest
-        ((execs inp ρ fs st ss).val, (execs inp ρ fs st ss).st) ∧
-      ((execs inp ρ fs st ss).val = .normal → vars' = names (execs inp ρ fs st ss).st.vars)
+        ((execs inp ρ N fs st Γ ss h hI).val, (execs inp ρ N fs st Γ ss h hI).st) ∧
+      ((execs inp ρ N fs st Γ ss h hI).val = .normal →
+        vars' = names (execs inp ρ N fs st Γ ss h hI).st.vars)
 
-def M5 (fs : Funs) (st : State) (e : Expression) : Prop :=
-  ∀ ctx q d k code, compileExpr ctx q d e k = .ok code → ∀ p, At prog p code →
+def M5 (fs : Funs) (st : State) (Γ : Scope) (e : Expression) (k : Nat)
+    (h : e.WellFormed EVM.dialect N Γ k) (hI : Agrees N fs st.vars Γ) : Prop :=
+  ∀ ctx q d code, compileExpr ctx q d e = .ok code → ∀ p, At prog p code →
     FunsOK prog fs ctx.funs → ctx.vars = names st.vars →
     ∀ s0 n T rest, T.length = d → s0.pc = p → s0.stack = T ++ vals st.vars ++ rest →
       s0.mem = st.mem → n = st.reads →
       EvalPost prog inp ρ s0 n st k (p + size code)
-        ((eval inp ρ fs st e).val, (eval inp ρ fs st e).st)
+        ((eval inp ρ N fs st Γ e k h hI).val, (eval inp ρ N fs st Γ e k h hI).st)
 
-def M6 (fs : Funs) (st : State) (es : List Expression) : Prop :=
+def M6 (fs : Funs) (st : State) (Γ : Scope) (es : List Expression)
+    (h : argsWellFormed EVM.dialect N Γ es) (hI : Agrees N fs st.vars Γ) : Prop :=
   ∀ ctx q d code, compileArgs ctx q d es = .ok code → ∀ p, At prog p code →
     FunsOK prog fs ctx.funs → ctx.vars = names st.vars →
     ∀ s0 n T rest, T.length = d → s0.pc = p → s0.stack = T ++ vals st.vars ++ rest →
       s0.mem = st.mem → n = st.reads →
       EvalPost prog inp ρ s0 n st es.length (p + size code)
-        ((evals inp ρ fs st es).val, (evals inp ρ fs st es).st)
+        ((evals inp ρ N fs st Γ es h hI).val, (evals inp ρ N fs st Γ es h hI).st)
 
 end
 
-variable {prog : Code} {inp : Input} {ρ : Readings}
+variable {prog : Code} {inp : Input} {ρ : Readings} {N : List String}
 
 /-! ## Runs that go to a state -/
 
@@ -268,21 +283,21 @@ theorem FunsOK.find (h : FunsOK prog fs cfs) (hf : cfs.find? f = some (info, cfs
 
 /-! ## Variables -/
 
-theorem get_of_idx {l : Vars} (h : (names l).idxOf? x = some j) :
-    (vals l)[j]? = some (Vars.get l x) := by
+theorem get_of_idx {l : Vars} (h : (names l).idxOf? x = some j) (hx : x ∈ names l) :
+    (vals l)[j]? = some (Vars.get l x hx) := by
   induction l generalizing j with
   | nil => simp at h
   | cons a l ih =>
     obtain ⟨y, w⟩ := a
     by_cases hy : y = x
-    · subst hy; simp [List.idxOf?_cons] at h; subst h; simp [Vars.get, List.lookup]
-    · have hb : (x == y) = false := by simp; exact fun e => hy e.symm
-      simp [List.idxOf?_cons, hy] at h
+    · subst hy; simp [List.idxOf?_cons] at h; subst h; simp [Vars.get]
+    · simp [List.idxOf?_cons, hy] at h
       obtain ⟨j', hj, rfl⟩ := h
-      simp [Vars.get, List.lookup, hb, ih hj, Vars.get]
+      have := ih hj (mem_names_tail hx hy)
+      simpa [Vars.get, hy] using this
 
-theorem vals_set {l : Vars} (h : (names l).idxOf? x = some j) :
-    vals (Vars.set l x v) = (vals l).set j v := by
+theorem vals_set {l : Vars} (h : (names l).idxOf? x = some j) (hx : x ∈ names l) :
+    vals (Vars.set l x hx v) = (vals l).set j v := by
   induction l generalizing j with
   | nil => simp at h
   | cons a l ih =>
@@ -291,66 +306,18 @@ theorem vals_set {l : Vars} (h : (names l).idxOf? x = some j) :
     · subst hy; simp [List.idxOf?_cons] at h; subst h; simp [Vars.set]
     · simp [List.idxOf?_cons, hy] at h
       obtain ⟨j', hj, rfl⟩ := h
-      simp [Vars.set, hy, ih hj]
+      simp [Vars.set, hy, ih hj (mem_names_tail hx hy)]
 
 theorem vals_append {a b : Vars} : vals (a ++ b) = vals a ++ vals b := List.map_append
 
-theorem vals_bind (h : vs.length = xs.length) : vals (bind xs vs) = vs := by
-  apply List.ext_getElem
-  · simp [Clocked.bind, h]
-  · intro k hk _; simp [Clocked.bind]; rw [List.getElem?_eq_getElem (by simp at hk; omega)]; rfl
-
-theorem vals_bind_nil : vals (bind xs []) = List.replicate xs.length 0 := by
-  apply List.ext_getElem <;> simp [Clocked.bind]
-
-theorem lookup_append_of_not_mem {A B : Vars} (h : r ∉ names A) :
-    (A ++ B).lookup r = B.lookup r := by
-  induction A with
-  | nil => rfl
-  | cons a A ih =>
-    obtain ⟨x, v⟩ := a
-    simp only [names, List.map_cons, List.mem_cons, not_or] at h
-    have hb : (r == x) = false := by simpa using h.1
-    simp only [List.cons_append, List.lookup, hb]
-    exact ih h.2
-
-theorem map_get_self {B : Vars} (h : (names B).Nodup) : (names B).map (Vars.get B) = vals B := by
-  induction B with
-  | nil => rfl
-  | cons a B ih =>
-    obtain ⟨x, v⟩ := a
-    simp only [names, List.map_cons, List.nodup_cons] at h ⊢
-    have e1 : Vars.get ((x, v) :: B) x = v := by simp [Vars.get, List.lookup]
-    rw [e1]
-    congr 1
-    have e := ih h.2
-    simp only [names, vals] at e
-    rw [← e]
-    apply List.map_congr_left
-    intro y hy
-    have hb : (y == x) = false := by simp; intro e; subst e; exact h.1 hy
-    simp [Vars.get, List.lookup, hb]
-
-theorem rets_get {l : Vars} (h : names l = ps ++ rs) (hn : (ps ++ rs).Nodup) :
-    rs.map (Vars.get l) = (vals l).drop ps.length := by
-  have h' : l.map (·.1) = ps ++ rs := h
-  have ht : names (l.take ps.length) = ps := by
-    show (l.take ps.length).map (·.1) = ps
-    rw [List.map_take, h']; simp
-  have hd : names (l.drop ps.length) = rs := by
-    show (l.drop ps.length).map (·.1) = rs
-    rw [List.map_drop, h']; simp
-  have hrs : rs.Nodup := (List.nodup_append.mp hn).2.1
-  have e1 : (vals l).drop ps.length = vals (l.drop ps.length) := (List.map_drop ..).symm
-  have e2 := map_get_self (B := l.drop ps.length) (hd ▸ hrs)
-  rw [hd] at e2
-  rw [e1, ← e2]
-  apply List.map_congr_left
-  intro r hr
-  have hnp : r ∉ names (l.take ps.length) := by
-    rw [ht]; intro hp; exact (List.nodup_append.mp hn).2.2 r hp r hr rfl
-  conv => lhs; rw [← List.take_append_drop ps.length l]
-  simp only [Vars.get, lookup_append_of_not_mem hnp]
+theorem vals_bind {h : vs.length = xs.length} : vals (bind xs vs h) = vs := by
+  induction xs generalizing vs with
+  | nil => cases vs with
+    | nil => rfl
+    | cons => simp at h
+  | cons x xs ih => cases vs with
+    | nil => simp at h
+    | cons v vs => simp only [Clocked.bind, List.map_cons, ih]
 
 /-! ## The compiled code -/
 
@@ -363,19 +330,13 @@ theorem compileStmts_cons (h : compileStmts ctx q j (s :: ss) = .ok (code, vars'
   exact ⟨c, vars, cs, h1, h2, rfl⟩
 
 theorem compileFunDef (h : compileStmt ctx q (.FunctionDefinition f ps rs body) = .ok (code, vars')) :
-    (ps ++ rs).Nodup ∧ ∃ cb c, compileBlock (funCtx ctx.funs q ps rs) (q ++ [0]) body = .ok cb ∧
+    ∃ cb c, compileBlock (funCtx ctx.funs q ps rs) (q ++ [0]) body = .ok cb ∧
       funCode q ps.length rs.length cb = .ok c ∧
       code = [.push (q, 1), .op .Jump] ++ c ++ [.label (q, 1)] ∧ vars' = ctx.vars := by
-  by_cases hn : (ps ++ rs).Nodup
-  · rw [compileStmt] at h
-    simp only [hn] at h
-    inv h
-    obtain ⟨cb, hb, c, hc, rfl, rfl⟩ := h
-    exact ⟨hn, cb, c, hb, hc, rfl, rfl⟩
-  · rw [compileStmt] at h
-    simp only [hn] at h
-    inv h
-
+  rw [compileStmt] at h
+  inv h
+  obtain ⟨cb, hb, c, hc, rfl, rfl⟩ := h
+  exact ⟨cb, c, hb, hc, rfl, rfl⟩
 
 theorem match_defs (h : compileStmts ctx q j ss = .ok (code, vars')) (hA : At prog p code) :
     Match (FunAt prog ctx.funs) (defs ss) (cdefs q j ss) := by
@@ -386,27 +347,17 @@ theorem match_defs (h : compileStmts ctx q j ss = .ok (code, vars')) (hA : At pr
     have ih' := ih h2 hA.right
     cases s with
     | FunctionDefinition f ps rs body =>
-      obtain ⟨hn, cb, c', hb, hc, rfl, rfl⟩ := compileFunDef h1
-      refine ⟨rfl, ⟨rfl, rfl, q ++ [j], rfl, hn, cb, c', hb, hc,
+      obtain ⟨cb, c', hb, hc, rfl, rfl⟩ := compileFunDef h1
+      refine ⟨rfl, ⟨rfl, rfl, q ++ [j], rfl, cb, c', hb, hc,
         p + size [Item.push (q ++ [j], 1), .op .Jump], ?_⟩, ih'⟩
       have := hA.left
       exact (At.left (a := [Item.push (q ++ [j], 1), .op .Jump] ++ c') this).right
     | _ => exact ih'
 
-theorem scope_ok (h : scope ctx q ss = .ok ctx') :
-    ctx' = { ctx with funs := cdefs q 0 ss :: ctx.funs } := by
-  unfold scope at h
-  simp only at h
-  split at h
-  · cases h; rfl
-  · cases h
-
-theorem funsOK_scope (hF : FunsOK prog fs ctx.funs) (hs : scope ctx q ss = .ok ctx')
-    (h : compileStmts ctx' q 0 ss = .ok (code, vars')) (hA : At prog p code) :
-    FunsOK prog (defs ss :: fs) ctx'.funs := by
-  have := match_defs h hA
-  obtain rfl := scope_ok hs
-  exact ⟨this, hF⟩
+theorem funsOK_scope (hF : FunsOK prog fs ctx.funs)
+    (h : compileStmts (scope ctx q ss) q 0 ss = .ok (code, vars')) (hA : At prog p code) :
+    FunsOK prog (defs ss :: fs) (scope ctx q ss).funs :=
+  ⟨match_defs h hA, hF⟩
 
 /-! ## Chains of steps -/
 

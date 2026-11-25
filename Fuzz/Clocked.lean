@@ -125,8 +125,8 @@ inductive Case where
 /-- a difference between geth and the interpreter on `o` and `calldata` -/
 def check (o : Object) (calldata : List UInt8) : IO (Except String Case) := do
   let text := o.print
-  if !decide (o.WellFormed EVM.dialect) then
-    return .error s!"the object is not well-formed in the EVM dialect\n{text}"
+  let some P := o.checkWellFormed EVM.dialect
+    | return .error s!"the object is not well-formed in the EVM dialect\n{text}"
   let .ok code ← solc text | return .ok .solcFailed
   match ← geth code calldata with
   | .error e => return .error e
@@ -139,8 +139,8 @@ def check (o : Object) (calldata : List UInt8) : IO (Except String Case) := do
     return .error s!"geth fails: {e}\n{text}\ncalldata {EVM.hex calldata}"
   | .ok (.ok data gas) =>
     let ρ : Readings := fun n => BitVec.ofNat 256 (gas.getD n 0)
-    let (outcome, st) := Clocked.top o calldata ρ gasLimit
-    let ours := outcome.result
+    let r := Clocked.top P calldata ρ gasLimit
+    let (ours, st) := (r.result, r.st)
     let info := s!"{text}\ncalldata {EVM.hex calldata}\ngas {gas}"
     if ours != some (.ret data) then
       return .error s!"geth returns {EVM.hex data}, we give {repr ours}\n{info}"

@@ -15,31 +15,36 @@ interpreter is in {lit}`YulSemnaticsZoo/Yul/Semantics/Clocked/Lemmas.lean`.
 namespace Yul.Clocked
 open Semantics
 
-variable {P : Object} {i : Input} {ρ : Readings}
+variable {P : WFObject} {i : Input} {ρ : Readings} {N : List String}
 
 /-- (Mono) for a statement: if the statement gives an outcome that is not a timeout, then with
 {name}`d` more clock at the start it gives the same outcome and the same state, with {name}`d` more
 clock at the end -/
-theorem exec_mono (fs : Funs) (st : State) (s : Statement) (d : Nat)
-    (h : (exec i ρ fs st s).val ≠ .timeout) :
-    exec i ρ fs (st.addClock d) s = (exec i ρ fs st s).shift d :=
-  (mono i ρ).1 fs st s d h
+theorem exec_mono (fs : Funs) (st : State) (Γ : Scope) (s : Statement)
+    (h : s.WellFormed EVM.dialect N Γ) (hI : Agrees N fs st.vars Γ) (d : Nat)
+    (hnt : (exec i ρ N fs st Γ s h hI).val ≠ .timeout) :
+    exec i ρ N fs (st.addClock d) Γ s h hI = (exec i ρ N fs st Γ s h hI).shift d :=
+  (mono i ρ N).1 fs st Γ s h hI d hnt
 
 /-- (Mono) for a block -/
-theorem execBlock_mono (fs : Funs) (st : State) (b : Block) (d : Nat)
-    (h : (execBlock i ρ fs st b).val ≠ .timeout) :
-    execBlock i ρ fs (st.addClock d) b = (execBlock i ρ fs st b).shift d :=
-  (mono i ρ).2.2.1 fs st b d h
+theorem execBlock_mono (fs : Funs) (st : State) (Γ : Scope) (b : Block)
+    (h : b.WellFormed EVM.dialect N Γ) (hI : Agrees N fs st.vars Γ) (d : Nat)
+    (hnt : (execBlock i ρ N fs st Γ b h hI).val ≠ .timeout) :
+    execBlock i ρ N fs (st.addClock d) Γ b h hI = (execBlock i ρ N fs st Γ b h hI).shift d :=
+  (mono i ρ N).2.2.1 fs st Γ b h hI d hnt
+
+/-- (Mono) for the code of an object -/
+theorem top_mono (hnt : (top P i ρ k).val ≠ .timeout) :
+    top P i ρ (d + k) = (top P i ρ k).shift d :=
+  execBlock_mono [] (start k) {} P.1.code _ _ d hnt
 
 /-- (Mono) for a run: a larger clock gives the same result -/
 theorem run_mono (h : run P i ρ k = some r) (hk : k ≤ k') : run P i ρ k' = some r := by
-  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
-  have hnt : (execBlock i ρ [] (start k) P.code).val ≠ .timeout := by
-    intro ht
-    simp [run, top, ht, Outcome.result] at h
-  have hm := execBlock_mono [] (start k) P.code d hnt
-  simp only [run, top] at h ⊢
-  rw [show start (k + d) = (start k).addClock d from rfl, hm]
+  obtain ⟨d, rfl⟩ : ∃ d, k' = d + k := ⟨k' - k, by omega⟩
+  have hnt : (top P i ρ k).val ≠ .timeout := fun ht => by
+    simp [run, Res.result_eq_none.mpr ht] at h
+  unfold run
+  rw [top_mono hnt]
   exact h
 
 /-- (Det): a run has at most one behaviour -/

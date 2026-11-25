@@ -5,8 +5,8 @@ import YulSemnaticsZoo.EVM.Semantics.Clocked.Step
 /-!
 # Fuzzing the compiler against the Yul semantics, the abstract EVM and geth
 
-For a random object `P` of the subset (`Fuzz.Yul.subsetObject`), random calldata `i`, random
-readings `ρ` and a random clock `k`: if `Compiler.compile P = some B`, then
+For a random object `P` of the subset (`Fuzz.Yul.subsetObject`) that is well-formed, random
+calldata `i`, random readings `ρ` and a random clock `k`: if `Compiler.compile P = some B`, then
 
 - (abstract) if `Yul.Clocked.run P i ρ k = some r`, then `EVM.runA B i ρ k'` halts with `r` for a
   large clock `k'`, after as many `GAS` instructions as the Yul run reads values; if the Yul run
@@ -17,9 +17,10 @@ readings `ρ` and a random clock `k`: if `Compiler.compile P = some B`, then
 The first check is the statement of `Compiler.compile_correct` for one `i`, `ρ` and `k`. The
 second check also tests the concrete EVM: geth uses real gas. A run where geth goes out of gas or
 past its stack limit of 1024 words is a resource failure, and is skipped and counted. 1 case in
-10 is a changed subset object (`Fuzz.Yul.mutateObject`, often not well-formed), and 1 in 10 an
-object with all builtins of the EVM dialect (`Fuzz.Yul.object`). Each compile failure is counted
-by its reason.
+10 is a changed subset object (`Fuzz.Yul.mutateObject`), and 1 in 10 an object with all builtins
+of the EVM dialect (`Fuzz.Yul.object`). The compiler takes only well-formed objects: the fuzzer
+skips and counts each object that is not well-formed. Each compile failure is counted by its
+reason.
 
 The abstract runs have no gas. Thus the size of each `return` that is not a literal becomes
 `lt(size, 64)` if it is not a number less than 1024 (`boundBlock`): a random reading, calldata
@@ -78,17 +79,20 @@ def cycle (ws : List Word) : Readings := fun n => ws.getD (n % ws.length) 0
 
 /-- the result of a case that agrees -/
 inductive Case where
+  /-- the object is not well-formed: the compiler does not take it -/
+  | notWellFormed
   | failed (e : Error)
   /-- the Yul run ends (`true`) or times out; the number of reads and ticks; the geth case -/
   | same (ends : Bool) (reads ticks : Nat) (geth : Fuzz.Clocked.Case)
 
 /-- the abstract check for `P` and its code `B` -/
-def abstract (P : Object) (B : List UInt8) (i : Input) (ws : List Word) (k : Nat) :
+def abstract (P : WFObject) (B : List UInt8) (i : Input) (ws : List Word) (k : Nat) :
     Except String (Bool × Nat × Nat) :=
   let ρ := cycle ws
-  let (o, st) := Clocked.top P i ρ k
-  let info := s!"{P.print}\ncode {EVM.hex B}\ncalldata {EVM.hex i}\nreadings {ws.map (·.toNat)}\nclock {k}"
-  match o.result with
+  let r := Clocked.top P i ρ k
+  let st := r.st
+  let info := s!"{P.1.print}\ncode {EVM.hex B}\ncalldata {EVM.hex i}\nreadings {ws.map (·.toNat)}\nclock {k}"
+  match r.result with
   | some r =>
     match EVM.runA B i ρ bigClock with
     | .halt r' n =>
@@ -102,8 +106,8 @@ def abstract (P : Object) (B : List UInt8) (i : Input) (ws : List Word) (k : Nat
     | e => .error s!"Yul times out, the EVM with the same clock gives {repr e}\n{info}"
 
 /-- the geth check for `P` and its code `B`, as in `Fuzz.Clocked.check` -/
-def geth (P : Object) (B : List UInt8) (i : Input) : IO (Except String Fuzz.Clocked.Case) := do
-  let info := s!"{P.print}\ncode {EVM.hex B}\ncalldata {EVM.hex i}"
+def geth (P : WFObject) (B : List UInt8) (i : Input) : IO (Except String Fuzz.Clocked.Case) := do
+  let info := s!"{P.1.print}\ncode {EVM.hex B}\ncalldata {EVM.hex i}"
   match ← Fuzz.Clocked.geth (EVM.hex B) i with
   | .error e => return .error e
   | .ok (.error e) =>
@@ -113,14 +117,16 @@ def geth (P : Object) (B : List UInt8) (i : Input) : IO (Except String Fuzz.Cloc
     return .error s!"geth fails: {e}\n{info}"
   | .ok (.ok data gas) =>
     let ρ : Readings := fun n => BitVec.ofNat 256 (gas.getD n 0)
-    let (o, st) := Clocked.top P i ρ Fuzz.Clocked.gasLimit
-    if o.result != some (.ret data) then
-      return .error s!"geth returns {EVM.hex data}, Yul gives {repr o.result}\n{info}\ngas {gas}"
+    let r := Clocked.top P i ρ Fuzz.Clocked.gasLimit
+    let st := r.st
+    if r.result != some (.ret data) then
+      return .error s!"geth returns {EVM.hex data}, Yul gives {repr r.result}\n{info}\ngas {gas}"
     if st.reads != gas.length then
       return .error s!"geth runs {gas.length} GAS, Yul reads {st.reads} values\n{info}"
     return .ok (.same st.reads (Fuzz.Clocked.gasLimit - st.clock))
 
 def check (P : Object) (i : Input) (ws : List Word) (k : Nat) : IO (Except String Case) := do
+  let some P := P.checkWellFormed EVM.dialect | return .ok .notWellFormed
   match compileE P with
   | .error e => return .ok (.failed e)
   | .ok B =>
@@ -141,10 +147,12 @@ structure Counts where
   gethSame : Nat := 0
   gethOutOfGas : Nat := 0
   gethStackLimit : Nat := 0
-  /-- the compile failures with each reason -/
+  /-- the objects that are not well-formed, and the compile failures with each reason -/
+  notWellFormed : Nat := 0
   failed : List (Error × Nat) := []
 
 def Counts.add (c : Counts) : Case → Counts
+  | .notWellFormed => { c with notWellFormed := c.notWellFormed + 1 }
   | .failed e =>
     { c with failed := match c.failed.lookup e with
       | some n => c.failed.map fun (e', m) => (e', if e' = e then n + 1 else m)
@@ -171,8 +179,9 @@ def run (g : StdGen) (n : Nat) (c : Counts) : Nat → IO (Except (Nat × String)
     let gen : Gen (List UInt8 × List Word × Nat) := do
       return (← list (← nat 0 64) byte, ← list (← nat 1 4) word, ← clock)
     let ((P, i, ws, clk), g) := Id.run do
-      -- 1 case in 10 is a changed object (which is often not well-formed), and 1 in 10 an object
-      -- with all builtins of the EVM dialect: the compiler must reject them
+      -- 1 case in 10 is a changed object (it is often not well-formed: then it is skipped and
+      -- counted), and 1 in 10 an object
+      -- with all builtins of the EVM dialect: the compiler must reject the builtins outside the 8
       let obj : Fuzz.Yul.YGen Object := do
         match ← (nat 0 9 : Gen Nat) with
         | 0 => Fuzz.Yul.mutateObject (← Fuzz.Yul.subsetObject)
@@ -200,7 +209,8 @@ def fuzz (args : List String) : IO UInt32 := do
     let failed := c.failed.map fun (e, n) => s!"{n} {repr e}"
     IO.println s!"no differences ({c.compiled} compiled: {c.ends} end, {c.timeouts} time out, \
       {c.reads} with gas reads, {c.ticks} with loop iterations or calls; geth: {c.gethSame} same, \
-      {c.gethOutOfGas} out of gas, {c.gethStackLimit} stack limit; compile failures: \
+      {c.gethOutOfGas} out of gas, {c.gethStackLimit} stack limit; not well-formed: \
+      {c.notWellFormed}; compile failures: \
       {if failed.isEmpty then "none" else ", ".intercalate failed})"
     return 0
 

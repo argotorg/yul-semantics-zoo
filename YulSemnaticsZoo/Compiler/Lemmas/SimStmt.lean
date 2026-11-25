@@ -11,7 +11,7 @@ The cases of {lit}`sim` for {lit}`exec` (but {lit}`for`), {lit}`execBlock` and {
 namespace Compiler
 open Semantics Yul Yul.Clocked
 
-variable {prog : Code} {inp : Input} {ρ : Readings}
+variable {prog : Code} {inp : Input} {ρ : Readings} {N : List String}
 
 /-! ## Assignments -/
 
@@ -27,9 +27,10 @@ theorem assign_cons (h : assign vars (x :: xs) = .ok ac) :
   · inv h
 
 theorem st_assign (h : assign vars xs = .ok ac) (hA : At prog s.pc (ac ++ c))
-    (hN : vars = names V) (hs : s.stack = vs ++ vals V ++ rest) (hl : vs.length = xs.length) :
+    (hN : vars = names V) (hs : s.stack = vs ++ vals V ++ rest) (hx : ∀ x ∈ xs, x ∈ names V)
+    (hl : vs.length = xs.length) :
     ∃ s', Steps (layout prog) inp ρ s n (2 * xs.length) s' n ∧
-      Is s' (s.pc + size ac) (vals (Vars.assign V xs vs) ++ rest) s.mem := by
+      Is s' (s.pc + size ac) (vals (Vars.assign V xs vs hx hl) ++ rest) s.mem := by
   induction xs generalizing V vs s ac with
   | nil =>
     rw [assign] at h; cases h
@@ -42,15 +43,16 @@ theorem st_assign (h : assign vars xs = .ok ac) (hA : At prog s.pc (ac ++ c))
       cases vs with
       | nil => simp at hl
       | cons v vs' => exact ⟨v, vs', rfl⟩
-    simp only [List.length_cons, Nat.add_right_cancel_iff] at hl
+    have hl' : vs'.length = xs.length := by simpa using hl
     have hj' : (names V).idxOf? x = some j := hN ▸ hj
     have hjl : j < (vals V).length := by
       have := (List.idxOf?_eq_some_iff.mp hj').1; simpa using this
-    have hv : (vs' ++ vals V ++ rest)[xs.length + 1 + j - 1]? = some (Vars.get V x) := by
+    have hxV : x ∈ names V := hx x (by simp)
+    have hv : (vs' ++ vals V ++ rest)[xs.length + 1 + j - 1]? = some (Vars.get V x hxV) := by
       rw [show xs.length + 1 + j - 1 = vs'.length + j by omega, List.append_assoc,
         List.getElem?_append_right (by omega), show vs'.length + j - vs'.length = j by omega,
         List.getElem?_append_left hjl]
-      exact get_of_idx hj'
+      exact get_of_idx hj' hxV
     have hA1 : At prog s.pc (.op (.Swap (xs.length + 1 + j) hk) :: (.op .Pop :: (ac' ++ c))) := by
       simpa using hA
     obtain ⟨s1, h1, hp1, hs1, hm1⟩ := st_swap (n := n) (ρ := ρ) (inp := inp) hA1
@@ -60,31 +62,35 @@ theorem st_assign (h : assign vars xs = .ok ac) (hA : At prog s.pc (ac ++ c))
     obtain ⟨s2, h2, hp2, hs2, hm2⟩ := st_pop (n := n) (ρ := ρ) (inp := inp) hA2 hs1
     have hA3 : At prog s2.pc (ac' ++ c) := by
       rw [hp2]; simpa [Item.size, EVM.Instr.encode, EVM.Instr.immediate] using hA2.tail
-    have hs2' : s2.stack = vs' ++ vals (Vars.set V x v) ++ rest := by
+    have hs2' : s2.stack = vs' ++ vals (Vars.set V x hxV v) ++ rest := by
       rw [hs2, vals_set hj', show xs.length + 1 + j - 1 = vs'.length + j by omega,
         List.append_assoc, List.set_append_right _ _ (by omega),
         show vs'.length + j - vs'.length = j by omega, List.set_append_left _ _ hjl,
         List.append_assoc]
-    obtain ⟨s3, h3, hp3, hs3, hm3⟩ := ih hac hA3 (by rw [names_set]; exact hN) hs2' hl
+    obtain ⟨s3, h3, hp3, hs3, hm3⟩ := ih hac hA3 (by rw [names_set]; exact hN) hs2'
+      (fun y hy => by rw [names_set]; exact hx y (by simp [hy])) hl'
     refine ⟨s3, by simpa [Nat.mul_add, Nat.add_comm] using (h1.trans h2).trans h3, ?_, ?_, ?_⟩
     · rw [hp3, hp2, hp1]; simp [Item.size, EVM.Instr.encode, EVM.Instr.immediate]; omega
-    · rw [hs3]; simp [Vars.assign]
+    · rw [hs3]; rfl
     · rw [hm3, hm2, hm1]
 
 /-! ## Statements -/
 
-theorem sim_block (ih : M3 prog inp ρ fs st b) : M1 prog inp ρ fs st (.Block b) := by
+theorem sim_block (ih : M3 prog inp ρ N fs st Γ b h' hI) :
+    M1 prog inp ρ N fs st Γ (.Block b) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, rfl, rfl⟩ := hc
   rw [exec]
   refine ⟨ih ctx q c hc p hA s0 n rest hp hP, fun _ => ?_⟩
-  rw [hP.names, (names_mono inp ρ).2.2.1 fs st b]
+  rw [hP.names]
+  exact names_execBlock.symm
 
-theorem sim_fundef (hg : Good prog) : M1 prog inp ρ fs st (.FunctionDefinition f ps rs body) := by
+theorem sim_fundef (hg : Good prog) :
+    M1 prog inp ρ N fs st Γ (.FunctionDefinition f ps rs body) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
-  obtain ⟨-, cb, c, -, -, rfl, rfl⟩ := compileFunDef hc
+  obtain ⟨cb, c, -, -, rfl, rfl⟩ := compileFunDef hc
   rw [exec]
   refine ⟨?_, fun _ => hP.names⟩
   have hA1 : At prog s0.pc (.push (q, 1) :: (.op .Jump :: (c ++ [.label (q, 1)]))) := by
@@ -109,7 +115,7 @@ theorem sim_fundef (hg : Good prog) : M1 prog inp ρ fs st (.FunctionDefinition 
   · rw [hs2, hP.stack]
   · rw [hm2, hm1, hP.mem]
 
-theorem sim_let_none : M1 prog inp ρ fs st (.VariableDeclaration xs none) := by
+theorem sim_let_none : M1 prog inp ρ N fs st Γ (.VariableDeclaration xs none) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
@@ -120,15 +126,18 @@ theorem sim_let_none : M1 prog inp ρ fs st (.VariableDeclaration xs none) := by
     (c := []) (by rw [hp]; simpa using hA)
   refine Goes.done ⟨s1, h1, hp1, hs1, hm1⟩ ?_ ?_ hP.mem hP.reads (by dsimp only; omega)
   · rw [hp]; simp [Item.size, push0, pushNat, toBytes, EVM.Instr.encode, EVM.Instr.immediate]
-  · rw [hP.stack]; simp [vals_bind_nil]
+  · rw [hP.stack]; simp [vals_bind]
 
-theorem sim_let (he : eval inp ρ fs st e = ⟨.ok vs, st1, h1⟩) (ih : M5 prog inp ρ fs st e) :
-    M1 prog inp ρ fs st (.VariableDeclaration xs (some e)) := by
+theorem sim_let {he1 : e.WellFormed EVM.dialect N Γ xs.length}
+    {p1 : AfterExpr st.vars xs.length (.ok vs) st1.vars}
+    (he : eval inp ρ N fs st Γ e xs.length he1 hI = ⟨.ok vs, st1, h1, p1⟩)
+    (ih : M5 prog inp ρ N fs st Γ e xs.length he1 hI) :
+    M1 prog inp ρ N fs st Γ (.VariableDeclaration xs (some e)) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, rfl, rfl⟩ := hc
-  have r := ih ctx q 0 xs.length c hc p hA hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx q 0 c hc p hA hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
   obtain ⟨hl, hv, g⟩ := r
@@ -136,35 +145,36 @@ theorem sim_let (he : eval inp ρ fs st e = ⟨.ok vs, st1, h1⟩) (ih : M5 prog
   rw [exec, he]
   refine ⟨?_, fun _ => by simp [hP.names, hv]⟩
   refine g.cast rfl ?_
-  rw [hP.stack, vals_append, vals_bind hl, hv]; simp
+  rw [hP.stack, vals_append, vals_bind, hv]; simp
 
-theorem sim_let_err (he : eval inp ρ fs st e = ⟨v, st1, h1⟩) (hv : ∀ vs, v = .ok vs → False)
-    (ih : M5 prog inp ρ fs st e) : M1 prog inp ρ fs st (.VariableDeclaration xs (some e)) := by
+theorem sim_let_err {he1 : e.WellFormed EVM.dialect N Γ xs.length}
+    {p1 : AfterExpr st.vars xs.length v st1.vars}
+    (he : eval inp ρ N fs st Γ e xs.length he1 hI = ⟨v, st1, h1, p1⟩)
+    (hv : ∀ vs, v = .ok vs → False) (ih : M5 prog inp ρ N fs st Γ e xs.length he1 hI) :
+    M1 prog inp ρ N fs st Γ (.VariableDeclaration xs (some e)) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, rfl, rfl⟩ := hc
-  have r := ih ctx q 0 xs.length c hc p hA hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx q 0 c hc p hA hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
-  have hr : exec inp ρ fs st (.VariableDeclaration xs (some e)) = ⟨v.outcome, st1, h1⟩ := by
-    rw [exec, he]
-    cases v with
-    | ok vs => exact absurd rfl (hv vs)
-    | _ => rfl
-  rw [hr]
-  refine ⟨StmtPost.of_eval r hv, fun h => ?_⟩
+  rw [exec, he]
   cases v with
   | ok vs => exact absurd rfl (hv vs)
-  | _ => cases h
+  | halt r' => exact ⟨r, fun h => by cases h⟩
+  | timeout => exact ⟨r, fun h => by cases h⟩
 
-theorem sim_assign (he : eval inp ρ fs st e = ⟨.ok vs, st1, h1⟩) (ih : M5 prog inp ρ fs st e) :
-    M1 prog inp ρ fs st (.Assignment xs e) := by
+theorem sim_assign {he1 : e.WellFormed EVM.dialect N Γ xs.length}
+    {p1 : AfterExpr st.vars xs.length (.ok vs) st1.vars}
+    (he : eval inp ρ N fs st Γ e xs.length he1 hI = ⟨.ok vs, st1, h1, p1⟩)
+    (ih : M5 prog inp ρ N fs st Γ e xs.length he1 hI) :
+    M1 prog inp ρ N fs st Γ (.Assignment xs e) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, ac, hac, rfl, rfl⟩ := hc
-  have r := ih ctx q 0 xs.length c hc p hA.left hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx q 0 c hc p hA.left hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
   obtain ⟨hl, hv, g⟩ := r
@@ -173,37 +183,37 @@ theorem sim_assign (he : eval inp ρ fs st e = ⟨.ok vs, st1, h1⟩) (ih : M5 p
   refine ⟨g.bind fun s1 hs1 => ?_, fun _ => by simp [hP.names, hv]⟩
   obtain ⟨s2, h2, hp2, hs2, hm2⟩ := st_assign (n := st1.reads) (ρ := ρ) (inp := inp) (c := [])
     hac (by rw [hs1.1]; simpa using hA.right) (V := st1.vars) (by rw [hP.names, hv])
-    (vs := vs) (rest := rest) (by rw [hs1.2.1, hP.stack, hv]; simp) hl
+    (vs := vs) (rest := rest) (by rw [hs1.2.1, hP.stack, hv]; simp) _ hl
   exact Goes.done ⟨s2, h2, hp2, hs2, hm2⟩ (by rw [hs1.1]; simp [Nat.add_assoc]) rfl hs1.2.2 rfl
     (by dsimp only; omega)
 
-theorem sim_assign_err (he : eval inp ρ fs st e = ⟨v, st1, h1⟩) (hv : ∀ vs, v = .ok vs → False)
-    (ih : M5 prog inp ρ fs st e) : M1 prog inp ρ fs st (.Assignment xs e) := by
+theorem sim_assign_err {he1 : e.WellFormed EVM.dialect N Γ xs.length}
+    {p1 : AfterExpr st.vars xs.length v st1.vars}
+    (he : eval inp ρ N fs st Γ e xs.length he1 hI = ⟨v, st1, h1, p1⟩)
+    (hv : ∀ vs, v = .ok vs → False) (ih : M5 prog inp ρ N fs st Γ e xs.length he1 hI) :
+    M1 prog inp ρ N fs st Γ (.Assignment xs e) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, ac, hac, rfl, rfl⟩ := hc
-  have r := ih ctx q 0 xs.length c hc p hA.left hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx q 0 c hc p hA.left hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
-  have hr : exec inp ρ fs st (.Assignment xs e) = ⟨v.outcome, st1, h1⟩ := by
-    rw [exec, he]
-    cases v with
-    | ok vs => exact absurd rfl (hv vs)
-    | _ => rfl
-  rw [hr]
-  refine ⟨StmtPost.of_eval r hv, fun h => ?_⟩
+  rw [exec, he]
   cases v with
   | ok vs => exact absurd rfl (hv vs)
-  | _ => cases h
+  | halt r' => exact ⟨r, fun h => by cases h⟩
+  | timeout => exact ⟨r, fun h => by cases h⟩
 
-theorem sim_expr (he : eval inp ρ fs st e = ⟨v, st1, h1⟩) (ih : M5 prog inp ρ fs st e) :
-    M1 prog inp ρ fs st (.Expression e) := by
+theorem sim_expr {h : (Statement.Expression e).WellFormed EVM.dialect N Γ}
+    (he : eval inp ρ N fs st Γ e 0 h hI = ⟨v, st1, h1, p1⟩)
+    (ih : M5 prog inp ρ N fs st Γ e 0 h hI) :
+    M1 prog inp ρ N fs st Γ (.Expression e) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   inv hc
   obtain ⟨c, hc, rfl, rfl⟩ := hc
-  have r := ih ctx q 0 0 c hc p hA hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx q 0 c hc p hA hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
   rw [exec, he]
@@ -220,7 +230,7 @@ theorem sim_expr (he : eval inp ρ fs st e = ⟨v, st1, h1⟩) (ih : M5 prog inp
 
 /-- the code of an {lit}`if` -/
 theorem compileIf (hc : compileStmt ctx q (.If c b) = .ok (code, vars')) :
-    ∃ cc cb, compileExpr ctx (q ++ [0]) 0 c 1 = .ok cc ∧ compileBlock ctx (q ++ [1]) b = .ok cb ∧
+    ∃ cc cb, compileExpr ctx (q ++ [0]) 0 c = .ok cc ∧ compileBlock ctx (q ++ [1]) b = .ok cb ∧
       code = cc ++ [push0, .op .Eq, .push (q, 0), .op .Jumpi] ++ cb ++ [.label (q, 0)] ∧
       vars' = ctx.vars := by
   rw [compileStmt] at hc
@@ -276,21 +286,23 @@ theorem ifCode_at
   · have := hA.right
     exact this.shift (by simp [EVM.Instr.immediate]; omega)
 
-theorem sim_if_zero (hg : Good prog) (he : eval inp ρ fs st c = ⟨.ok vs, st1, h1⟩)
-    (hz : vs.headD 0 = 0) (ih : M5 prog inp ρ fs st c) : M1 prog inp ρ fs st (.If c b) := by
+theorem sim_if_zero (hg : Good prog) (he : eval inp ρ N fs st Γ c 1 hc1 hI = ⟨.ok vs, st1, h1, p1⟩)
+    (hz : vs.head hne = 0) (ih : M5 prog inp ρ N fs st Γ c 1 hc1 hI) :
+    M1 prog inp ρ N fs st Γ (.If c b) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   obtain ⟨cc, cb, hcc, hcb, rfl, rfl⟩ := compileIf hc
-  have r := ih ctx (q ++ [0]) 0 1 cc hcc p (hA.left.left.left) hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx (q ++ [0]) 0 cc hcc p (hA.left.left.left) hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
   obtain ⟨hl, hv, g⟩ := r
   dsimp only at hv g
+  rw [exec, he]
+  dsimp only
   obtain ⟨v, rfl⟩ : ∃ v, vs = [v] := by
     match vs, hl with | [v], _ => exact ⟨v, rfl⟩
-  simp only [List.headD_cons] at hz
+  simp only [List.head_cons] at hz
   subst hz
-  rw [exec, he]
-  simp only [List.headD_cons, ite_true]
+  simp only [List.head_cons, ite_true]
   refine ⟨g.bind fun s1 hs1 => ?_, fun _ => by simp [hP.names, hv]⟩
   obtain ⟨-, hAt, -, hL⟩ := ifCode_at hA
   obtain ⟨s2, h2, hs2⟩ := st_test (n := st1.reads) (ρ := ρ) (inp := inp) hg (hAt.at hs1.1) hL
@@ -316,54 +328,51 @@ theorem Pre.same (hP : Pre prog ctx fs st s0 n rest) (hv : st1.vars = st.vars)
   mem := hs.2.2
   reads := rfl
 
-theorem sim_if_ne (hg : Good prog) (he : eval inp ρ fs st c = ⟨.ok vs, st1, h1⟩)
-    (hz : ¬vs.headD 0 = 0) (ih : M5 prog inp ρ fs st c) (ihb : M3 prog inp ρ fs st1 b) :
-    M1 prog inp ρ fs st (.If c b) := by
+theorem sim_if_ne (hg : Good prog) (he : eval inp ρ N fs st Γ c 1 hc1 hI = ⟨.ok vs, st1, h1, p1⟩)
+    (hz : ¬vs.head hne = 0) (ih : M5 prog inp ρ N fs st Γ c 1 hc1 hI)
+    (ihb : M3 prog inp ρ N fs st1 Γ b hb hI1) :
+    M1 prog inp ρ N fs st Γ (.If c b) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   obtain ⟨cc, cb, hcc, hcb, rfl, rfl⟩ := compileIf hc
   obtain ⟨hAc, hAt, hAb, hL⟩ := ifCode_at hA
-  have r := ih ctx (q ++ [0]) 0 1 cc hcc p hAc hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx (q ++ [0]) 0 cc hcc p hAc hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
   obtain ⟨hl, hv, g⟩ := r
   dsimp only at hv g
+  rw [exec, he]
+  dsimp only
   obtain ⟨v, rfl⟩ : ∃ v, vs = [v] := by
     match vs, hl with | [v], _ => exact ⟨v, rfl⟩
-  simp only [List.headD_cons] at hz
-  rw [exec, he]
-  simp only [List.headD_cons, hz, ite_false]
-  have hnm := (names_mono inp ρ).2.2.1 fs st1 b
-  refine ⟨StmtPost.pre g fun s1 hs1 => ?_, fun _ => by
-    simp only [Res.up]; rw [hnm, hP.names, hv]⟩
+  simp only [List.head_cons] at hz
+  simp only [List.head_cons, hz, ite_false]
+  have hnm : names (execBlock inp ρ N fs st1 Γ b hb hI1).st.vars = names st1.vars := names_execBlock
+  refine ⟨StmtPost.pre g fun s1 hs1 => ?_, fun _ => by rw [hnm, hP.names, hv]⟩
   obtain ⟨s2, h2, hs2⟩ := st_test (n := st1.reads) (ρ := ρ) (inp := inp) hg (hAt.at hs1.1) hL
     hs1.2.1
   simp only [hz, ite_false] at hs2
-  have hb := ihb ctx (q ++ [1]) cb hcb (p + size cc + 6) hAb s2 st1.reads rest
+  have hb' := ihb ctx (q ++ [1]) cb hcb (p + size cc + 6) hAb s2 st1.reads rest
     (by rw [hs2.1, hs1.1])
     (hP.same hv ⟨hs2.1, by rw [hs2.2.1, hP.stack]; rfl, hs2.2.2.trans hs1.2.2⟩)
-  have := (StmtPost.steps h2 hb).label hL
+  have := (StmtPost.steps h2 hb').label hL
   exact this.cast_pc (by simp [EVM.Instr.immediate]; omega)
 
-theorem sim_if_err (he : eval inp ρ fs st c = ⟨v, st1, h1⟩) (hv : ∀ vs, v = .ok vs → False)
-    (ih : M5 prog inp ρ fs st c) : M1 prog inp ρ fs st (.If c b) := by
+theorem sim_if_err (he : eval inp ρ N fs st Γ c 1 hc1 hI = ⟨v, st1, h1, p1⟩)
+    (hv : ∀ vs, v = .ok vs → False) (ih : M5 prog inp ρ N fs st Γ c 1 hc1 hI) :
+    M1 prog inp ρ N fs st Γ (.If c b) h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   obtain ⟨cc, cb, hcc, hcb, rfl, rfl⟩ := compileIf hc
   obtain ⟨hAc, -, -, -⟩ := ifCode_at hA
-  have r := ih ctx (q ++ [0]) 0 1 cc hcc p hAc hP.funs hP.names s0 n [] rest rfl hp
+  have r := ih ctx (q ++ [0]) 0 cc hcc p hAc hP.funs hP.names s0 n [] rest rfl hp
     (by simp [hP.stack]) hP.mem hP.reads
   rw [he] at r
-  have hr : exec inp ρ fs st (.If c b) = ⟨v.outcome, st1, h1⟩ := by
-    rw [exec, he]
-    cases v with
-    | ok vs => exact absurd rfl (hv vs)
-    | _ => rfl
-  rw [hr]
-  refine ⟨StmtPost.of_eval r hv, fun h => ?_⟩
+  rw [exec, he]
   cases v with
   | ok vs => exact absurd rfl (hv vs)
-  | _ => cases h
+  | halt r' => exact ⟨r, fun h => by cases h⟩
+  | timeout => exact ⟨r, fun h => by cases h⟩
 
-theorem sim_break (hg : Good prog) : M1 prog inp ρ fs st .Break := by
+theorem sim_break (hg : Good prog) : M1 prog inp ρ N fs st Γ .Break h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   split at hc
@@ -375,7 +384,7 @@ theorem sim_break (hg : Good prog) : M1 prog inp ρ fs st .Break := by
       hP.stack (by rw [hP.names]; simp)) rfl rfl hP.mem hP.reads (by simp)⟩, fun h => by cases h⟩
   · cases hc
 
-theorem sim_continue (hg : Good prog) : M1 prog inp ρ fs st .Continue := by
+theorem sim_continue (hg : Good prog) : M1 prog inp ρ N fs st Γ .Continue h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   split at hc
@@ -387,7 +396,7 @@ theorem sim_continue (hg : Good prog) : M1 prog inp ρ fs st .Continue := by
       hP.stack (by rw [hP.names]; simp)) rfl rfl hP.mem hP.reads (by simp)⟩, fun h => by cases h⟩
   · cases hc
 
-theorem sim_leave (hg : Good prog) : M1 prog inp ρ fs st .Leave := by
+theorem sim_leave (hg : Good prog) : M1 prog inp ρ N fs st Γ .Leave h hI := by
   intro ctx q code vars' hc p hA s0 n rest hp hP
   rw [compileStmt] at hc
   split at hc
@@ -402,12 +411,12 @@ theorem sim_leave (hg : Good prog) : M1 prog inp ρ fs st .Leave := by
 /-! ## Blocks and lists of statements -/
 
 theorem compileBlock_ok (h : compileBlock ctx q ⟨ss⟩ = .ok code) :
-    ∃ ctx' c vars, scope ctx q ss = .ok ctx' ∧ compileStmts ctx' q 0 ss = .ok (c, vars) ∧
+    ∃ c vars, compileStmts (scope ctx q ss) q 0 ss = .ok (c, vars) ∧
       code = c ++ pops (vars.length - ctx.vars.length) := by
   rw [compileBlock] at h
   inv h
-  obtain ⟨ctx', hs, ⟨c, vars⟩, hc, rfl⟩ := h
-  exact ⟨ctx', c, vars, hs, hc, rfl⟩
+  obtain ⟨⟨c, vars⟩, hc, rfl⟩ := h
+  exact ⟨c, vars, hc, rfl⟩
 
 theorem length_le_of_suffix {a b : Vars} (h : names a <:+ names b) : a.length ≤ b.length := by
   have := h.length_le; simpa using this
@@ -420,29 +429,33 @@ theorem drop_restrict {st st1 : State} (hl : st.vars.length ≤ st1.vars.length)
   simp only [restrict, List.drop_drop, List.length_drop]
   congr 1; omega
 
-theorem sim_execBlock (he : execs inp ρ (defs ss :: fs) st ss = ⟨o, st1, h1⟩)
-    (ih : M4 prog inp ρ (defs ss :: fs) st ss) : M3 prog inp ρ fs st ⟨ss⟩ := by
+theorem sim_execBlock
+    (he : execs inp ρ N (defs ss :: fs) st { Γ with funs := functions ss ++ Γ.funs } ss hss hI' =
+      ⟨o, st1, h1, p1⟩)
+    (ih : M4 prog inp ρ N (defs ss :: fs) st { Γ with funs := functions ss ++ Γ.funs } ss hss hI') :
+    M3 prog inp ρ N fs st Γ ⟨ss⟩ h hI := by
   intro ctx q code hc p hA s0 n rest hp hP
-  obtain ⟨ctx', c, vars, hsc, hcs, rfl⟩ := compileBlock_ok hc
-  have hctx := scope_ok hsc
-  have hP' : Pre prog ctx' (defs ss :: fs) st s0 n rest :=
-    { funs := funsOK_scope hP.funs hsc hcs hA.left
-      names := by rw [hctx]; exact hP.names
-      loop := by rw [hctx]; exact hP.loop
-      leave := by rw [hctx]; exact hP.leave
+  obtain ⟨c, vars, hcs, rfl⟩ := compileBlock_ok hc
+  have hP' : Pre prog (scope ctx q ss) (defs ss :: fs) st s0 n rest :=
+    { funs := funsOK_scope hP.funs hcs hA.left
+      names := hP.names
+      loop := hP.loop
+      leave := hP.leave
       stack := hP.stack
       mem := hP.mem
       reads := hP.reads }
-  have r := ih ctx' q 0 c vars hcs p hA.left s0 n rest hp hP'
-  have hsuf := (names_mono inp ρ).2.2.2.1 (defs ss :: fs) st ss
+  have r := ih (scope ctx q ss) q 0 c vars hcs p hA.left s0 n rest hp hP'
+  have hsuf : names st.vars <:+
+      names (execs inp ρ N (defs ss :: fs) st { Γ with funs := functions ss ++ Γ.funs } ss hss hI').st.vars :=
+    names_execs
   rw [he] at r hsuf
   obtain ⟨r, hnm⟩ := r
   dsimp only at hsuf
   have hl := length_le_of_suffix hsuf
   rw [execBlock, he]
   dsimp only
-  have hloop : ctx'.loop = ctx.loop := by rw [hctx]
-  have hleave : ctx'.leave = ctx.leave := by rw [hctx]
+  have hloop : (scope ctx q ss).loop = ctx.loop := rfl
+  have hleave : (scope ctx q ss).leave = ctx.leave := rfl
   cases o with
   | normal =>
     refine Goes.bind r fun s1 hs1 => ?_
@@ -472,7 +485,7 @@ theorem sim_execBlock (he : execs inp ρ (defs ss :: fs) st ss = ⟨o, st1, h1�
   | halt r' => exact r
   | timeout => exact r
 
-theorem sim_execs_nil : M4 prog inp ρ fs st [] := by
+theorem sim_execs_nil : M4 prog inp ρ N fs st Γ [] h hI := by
   intro ctx q j code vars' hc p hA s0 n rest hp hP
   rw [compileStmts] at hc
   cases hc
@@ -480,13 +493,15 @@ theorem sim_execs_nil : M4 prog inp ρ fs st [] := by
   exact ⟨Goes.refl ⟨by simp [hp], hP.stack, hP.mem⟩ hP.reads (Nat.le_refl _),
     fun _ => hP.names⟩
 
-theorem sim_execs_cons (he : exec inp ρ fs st s = ⟨.normal, st2, h2⟩)
-    (ih1 : M1 prog inp ρ fs st s) (ih2 : M4 prog inp ρ fs st2 ss) :
-    M4 prog inp ρ fs st (s :: ss) := by
+theorem sim_execs_cons (he : exec inp ρ N fs st Γ s hs hI = ⟨o, st2, h2, p2⟩)
+    (ho : o = .normal) (ih1 : M1 prog inp ρ N fs st Γ s hs hI)
+    (ih2 : M4 prog inp ρ N fs st2 (Scope.after Γ s) ss hss hI2) :
+    M4 prog inp ρ N fs st Γ (s :: ss) h hI := by
+  subst ho
   intro ctx q j code vars' hc p hA s0 n rest hp hP
   obtain ⟨c, vars, cs, h1, h2', rfl⟩ := compileStmts_cons hc
   have r1 := ih1 ctx (q ++ [j]) c vars h1 p hA.left s0 n rest hp hP
-  have hsuf := (names_mono inp ρ).1 fs st s
+  have hsuf : names st.vars <:+ names (exec inp ρ N fs st Γ s hs hI).st.vars := names_exec
   rw [he] at r1 hsuf
   obtain ⟨g, hn⟩ := r1
   dsimp only at hsuf g
@@ -506,21 +521,22 @@ theorem sim_execs_cons (he : exec inp ρ fs st s = ⟨.normal, st2, h2⟩)
     st2.reads rest hs1.1 (hP2 s1 hs1)
   rw [execs, he]
   dsimp only
+  rw [dite_eq_left rfl]
   obtain ⟨_, s1, -, hs1, -⟩ := id g
   refine ⟨StmtPost.pre g fun s1 hs1 => (r2 s1 hs1).1.cast_pc (by simp [Nat.add_assoc]),
     fun h => ?_⟩
   exact (r2 s1 hs1).2 h
 
-theorem sim_execs_stop (he : exec inp ρ fs st s = ⟨o, st2, h2⟩) (ho : o ≠ .normal)
-    (ih1 : M1 prog inp ρ fs st s) : M4 prog inp ρ fs st (s :: ss) := by
+theorem sim_execs_stop (he : exec inp ρ N fs st Γ s hs hI = ⟨o, st2, h2, p2⟩)
+    (ho : ¬o = .normal) (ih1 : M1 prog inp ρ N fs st Γ s hs hI) :
+    M4 prog inp ρ N fs st Γ (s :: ss) h hI := by
   intro ctx q j code vars' hc p hA s0 n rest hp hP
   obtain ⟨c, vars, cs, h1, h2', rfl⟩ := compileStmts_cons hc
   have r1 := ih1 ctx (q ++ [j]) c vars h1 p hA.left s0 n rest hp hP
   rw [he] at r1
-  have hr : execs inp ρ fs st (s :: ss) = ⟨o, st2, h2⟩ := by
-    rw [execs, he]
-    cases o <;> first | exact absurd rfl ho | rfl
-  rw [hr]
+  rw [execs, he]
+  dsimp only
+  rw [dite_eq_right ho]
   exact ⟨r1.1.anyPc ho, fun h => absurd h ho⟩
 
 end Compiler

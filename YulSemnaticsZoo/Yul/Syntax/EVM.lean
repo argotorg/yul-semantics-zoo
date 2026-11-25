@@ -52,6 +52,16 @@ def outs : Builtin → Nat
   | .Codecopy | .Extcodecopy | .Mstore | .Return | .Datacopy | .Setimmutable _ => 0
   | .Verbatim _ o _ => o
 
+/-- the number of arguments of a builtin that are not literals -/
+def ins : Builtin → Nat
+  | .Gas | .Dataoffset _ | .Datasize _ | .Loadimmutable _ | .Linkersymbol _ | .Memoryguard _ => 0
+  | .Calldataload | .Mload => 1
+  | .Add | .Lt | .Eq | .Mstore | .Return | .Setimmutable _ => 2
+  | .Codecopy | .Create | .Datacopy => 3
+  | .Extcodecopy => 4
+  | .Call => 7
+  | .Verbatim i _ _ => i
+
 /-- the name of the sub-object or data that a builtin refers to -/
 def dataName : Builtin → Option String
   | .Dataoffset name | .Datasize name => some name
@@ -135,6 +145,19 @@ def builtin : Identifier → Option (List Arg × (List Literal → Option Builti
   | "memoryguard" => some ([.Literal], fun ls => (size? ls).map .Memoryguard)
   | f => (verbatim? f).map fun (i, o) =>
     (.Literal :: List.replicate i .Expression, fun ls => (code? ls).map (.Verbatim i o))
+
+/-- a builtin has {name}`ins` arguments that are not literals -/
+theorem builtin_ins (h : builtin f = some (kinds, mk)) (hb : mk ls = some b) :
+    kinds.count .Expression = ins b := by
+  unfold builtin at h
+  split at h <;> simp only [plain, Option.some.injEq, Prod.mk.injEq, Option.map_eq_some_iff] at h
+  all_goals first
+    | (obtain ⟨rfl, rfl⟩ := h; simp at hb; subst hb; simp [ins])
+    | (obtain ⟨rfl, rfl⟩ := h; simp only [Option.map_eq_some_iff] at hb
+       obtain ⟨_, -, rfl⟩ := hb; simp [ins])
+    | (obtain ⟨⟨i, o⟩, -, h⟩ := h; simp only at h; obtain ⟨rfl, rfl⟩ := h
+       simp only [Option.map_eq_some_iff] at hb; obtain ⟨_, -, rfl⟩ := hb
+       simp [ins])
 
 -- reducible: then `simp` sees that `dialect.Builtin` is `Builtin` (the proofs of the clocked
 -- semantics need this)

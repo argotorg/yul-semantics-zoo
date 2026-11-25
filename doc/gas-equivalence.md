@@ -46,6 +46,12 @@ three changes:
 The abstract Yul semantics has the first two changes for `gas()`. It has no limit on the depth of
 function calls.
 
+The Yul semantics is only for Yul objects that are well-formed in the EVM dialect. In Lean, the
+type `Yul.WFObject` (`{ P : Object // P.WellFormed EVM.dialect }`) has these objects. The Yul
+semantics (`run`, `⇝`, `beh`), `≈` on Yul objects and `compile` take a `WFObject`. The
+interpreter has the proof of well-formedness for each part of the AST: there is no rule for an
+AST that is not well-formed.
+
 `⟪P, i, ρ⟫ ⇝ b` means: the run of `P` with input `i` and readings `ρ` has the behaviour `b`. `P` is
 a Yul program or an EVM program, and `⇝` uses the semantics for its language. Each semantics must
 satisfy:
@@ -98,6 +104,8 @@ compile : Yul → Option EVM
 opt     : Yul → Yul
 ```
 
+`Yul` is the type of the well-formed Yul objects (`Yul.WFObject`).
+
 1. **Compilation:**
 
    ```
@@ -113,6 +121,10 @@ opt     : Yul → Yul
    ```
    result_C(B, i, g) = some r  →  beh(B, i, reads(B, i, g)) = Ends(r)
    ```
+
+   Lean proves obligation 3 as `EVM.refines` (`Refinement.lean`). `EVM.runA_of_runC` gives the
+   stronger form: for each `ρ` that agrees with the reads of the concrete run, the abstract run
+   halts with `r` at the same clock `g + 1`.
 
 Obligation 1 has no condition on the runs. `compile` gives `none` for each builtin that the Yul
 semantics does not define, also if no run gets to it. Thus `compile(P) = some B` only for a `P`
@@ -159,11 +171,11 @@ Proof:
 |---|---|---|
 | (Mono), (Det), (Total) for Yul | `Yul.Clocked.run_mono`, `det`, `total` | proven |
 | (Mono), (Det), (Total) for the abstract EVM | `EVM.run_mono`, `Runs.det`, `Runs.total` | proven |
-| Obligation 1 for `Compiler.compile` | `Compiler.compile_correct` | proven |
+| Obligation 1 for `Compiler.compile` | `Compiler.compile_correct` | proven, for each `WFObject` |
 | (Congr) | `Compiler.compile_congr` | proven |
-| (Concrete) | `Compiler.compile_concrete` | proven, with obligation 3 for `B` as a hypothesis |
+| (Concrete) | `Compiler.compile_concrete` | proven, with `EVM.refines` for obligation 3 |
 | Obligation 2 | none | the repository has no `opt` |
-| Obligation 3 | none | not proven in this branch; `Tests/EVM.lean` checks it on random code |
+| Obligation 3 | `EVM.refines` | proven; `EVM.runA_of_runC` is the stronger form |
 | Corollary | none | follows from obligations 1, 2 and 3 |
 
 For the two EVM programs of (Congr), Lean writes `B ≈ₑ C` (`EVM.Equiv`): Lean has `≈` on lists

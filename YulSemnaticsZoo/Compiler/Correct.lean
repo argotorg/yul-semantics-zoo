@@ -1,16 +1,16 @@
 import YulSemnaticsZoo.Compiler.Lemmas.Main
 import YulSemnaticsZoo.Yul.Semantics.Clocked.Theorems
-import YulSemnaticsZoo.EVM.Semantics.Clocked.Gas
+import YulSemnaticsZoo.EVM.Semantics.Clocked.Refinement
 
 set_option doc.verso true
 
 /-!
 # Compiler: correctness
 
-Obligation 1 of {lit}`doc/gas-equivalence.md` for {lit}`compile`: if the compiler gives code, the
-code and the object have the same behaviour for each input {lit}`i` and each readings
-{lit}`ρ`. There is no condition on the run: the compiler rejects each builtin that the semantics
-does not define.
+Obligation 1 of {lit}`doc/gas-equivalence.md` for {lit}`compile`: if the compiler gives code for a
+well-formed object, the code and the object have the same behaviour for each input {lit}`i` and
+each readings {lit}`ρ`. There is no condition on the run: the compiler rejects each builtin that
+the semantics does not define.
 
 The proof is a forward simulation (in {lit}`YulSemnaticsZoo/Compiler/Lemmas`). For each
 function of the interpreter, the EVM run of the compiled code gives the same outcome, after at
@@ -29,9 +29,9 @@ one behaviour.
 namespace Yul.Clocked
 
 /-- {lit}`P ≈ Q`: the two objects have the same behaviour for each input and each readings -/
-def Equiv (P Q : Object) : Prop := ∀ i ρ b, ⟪P, i, ρ⟫ ⇝ b ↔ ⟪Q, i, ρ⟫ ⇝ b
+def Equiv (P Q : WFObject) : Prop := ∀ i ρ b, ⟪P, i, ρ⟫ ⇝ b ↔ ⟪Q, i, ρ⟫ ⇝ b
 
-instance : HasEquiv Object := ⟨Equiv⟩
+instance : HasEquiv WFObject := ⟨Equiv⟩
 
 end Yul.Clocked
 
@@ -46,12 +46,14 @@ def Equiv (B C : List UInt8) : Prop := ∀ i ρ b, ⟪B, i, ρ⟫ ⇝ b ↔ ⟪C
 end EVM
 
 namespace Compiler
-open Semantics Yul.Clocked EVM
+open Semantics Yul Yul.Clocked EVM
 
 /-- the EVM code {name}`B` and the Yul object {name}`P` have the same behaviour for each input and
 each readings -/
-def Equiv (B : List UInt8) (P : Yul.Object) : Prop :=
+def Equiv (B : List UInt8) (P : WFObject) : Prop :=
   ∀ i ρ b, (⟪B, i, ρ⟫ ⇝ b ↔ ⟪P, i, ρ⟫ ⇝ b)
+
+variable {P Q : WFObject}
 
 theorem compileE_of_compile (h : compile P = some B) : compileE P = .ok B := by
   unfold compile at h
@@ -79,12 +81,11 @@ theorem compile_congr (hPQ : P ≈ Q) (hP : compile P = some B) (hQ : compile Q 
     B ≈ₑ C := fun i ρ b =>
   (compile_correct hP i ρ b).trans ((hPQ i ρ b).trans (compile_correct hQ i ρ b).symm)
 
-/-- With obligation 3 for the code {name}`B` (the hypothesis {name}`h3`): if the concrete run of
-{name}`B` with gas {name}`g` halts with {name}`r`, then the object ends with {name}`r` for the
-readings of that run. -/
-theorem compile_concrete
-    (h3 : ∀ i g r, result_C B i g = some r → ⟪B, i, reads B i g⟫ ⇝ .ends r)
-    (hP : compile P = some B) (hr : result_C B i g = some r) : ⟪P, i, reads B i g⟫ ⇝ .ends r :=
-  (compile_correct hP i (reads B i g) (.ends r)).mp (h3 i g r hr)
+/-- If the concrete run of the code {name}`B` with gas {name}`g` halts with {name}`r`, then the
+object ends with {name}`r` for the readings of that run: obligation 3 ({name}`EVM.refines`), then
+obligation 1 -/
+theorem compile_concrete (hP : compile P = some B) (hr : result_C B i g = some r) :
+    ⟪P, i, reads B i g⟫ ⇝ .ends r :=
+  (compile_correct hP i (reads B i g) (.ends r)).mp (EVM.refines hr)
 
 end Compiler

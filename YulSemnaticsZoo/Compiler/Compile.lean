@@ -7,8 +7,8 @@ set_option doc.verso true
 /-!
 # Compiler: Yul to EVM
 
-{lit}`compile` translates the code of the top object of a Yul program in the EVM dialect to EVM
-bytecode. It is a pure function. It gives {lit}`none` if the object is not well-formed, if the
+{lit}`compile` translates the code of the top object of a Yul program that is well-formed in the
+EVM dialect ({lit}`WFObject`) to EVM bytecode. It is a pure function. It gives {lit}`none` if the
 code calls a builtin outside the 8 builtins of the clocked semantics, or if it cannot make the
 code: a variable or a return variable is more than 16 words deep in the stack, or the code is
 larger than {lit}`2 ^ 16` bytes.
@@ -39,10 +39,11 @@ larger than {lit}`2 ^ 16` bytes.
 Each loop iteration of the Yul semantics starts at a {lit}`JUMPDEST`, and each call runs a
 {lit}`JUMP`. Thus each tick of the Yul clock is at least one EVM instruction.
 
-The compiler checks only some of the rules of well-formed code again (each name is bound, each
-expression has the number of values that its place needs, and {lit}`break`, {lit}`continue` and
-{lit}`leave` have a target). The proof of correctness uses these checks, and not
-{lit}`Object.WellFormed`.
+The compiler does not check the rules of well-formed code: the proof of correctness gets the
+number of values of each expression, and the names of the functions and parameters, from the
+proof that the object is well-formed. A lookup of a variable, a function, or the target of
+{lit}`break`, {lit}`continue` and {lit}`leave` gives an {lit}`Option`; for a well-formed object
+it gives a value, and the compiler gives an error for {lit}`none`.
 -/
 
 namespace Compiler
@@ -50,20 +51,14 @@ open Yul Semantics
 
 /-- the reason why the compiler gives no code -/
 inductive Error where
-  /-- the object is not well-formed in the EVM dialect -/
-  | notWellFormed
   /-- a builtin outside the 8 builtins of the clocked semantics -/
   | unsupported
-  /-- an expression without the number of values that its place needs, or a call with the wrong
-  number of arguments -/
-  | arity
-  /-- a variable or function that is not in scope -/
+  /-- a variable or function that is not in scope; this does not occur for a well-formed
+  object -/
   | unbound
-  /-- {lit}`break` or {lit}`continue` outside a loop body, or {lit}`leave` outside a function -/
+  /-- {lit}`break` or {lit}`continue` outside a loop body, or {lit}`leave` outside a function;
+  this does not occur for a well-formed object -/
   | misplaced
-  /-- two functions of a block, or two parameters or return variables of a function, with the
-  same name -/
-  | duplicate
   /-- a variable more than 16 words deep in the stack, or more than 16 return variables -/
   | stackTooDeep
   /-- code larger than {lit}`2 ^ 16` bytes: a {lit}`PUSH2` cannot give each position -/
@@ -146,17 +141,16 @@ structure Ctx where
   return variables -/
   leave : Option (Label × Nat) := none
 
-/-- the instruction of a builtin of the clocked semantics, its number of arguments and its number
-of values -/
-def builtinOp : Yul.EVM.Builtin → Option (EVM.Instr × Nat × Nat)
-  | .Add => some (.Add, 2, 1)
-  | .Lt => some (.Lt, 2, 1)
-  | .Eq => some (.Eq, 2, 1)
-  | .Calldataload => some (.Calldataload, 1, 1)
-  | .Mload => some (.Mload, 1, 1)
-  | .Mstore => some (.Mstore, 2, 0)
-  | .Gas => some (.Gas, 0, 1)
-  | .Return => some (.Return, 2, 0)
+/-- the instruction of a builtin of the clocked semantics -/
+def builtinOp : Yul.EVM.Builtin → Option EVM.Instr
+  | .Add => some .Add
+  | .Lt => some .Lt
+  | .Eq => some .Eq
+  | .Calldataload => some .Calldataload
+  | .Mload => some .Mload
+  | .Mstore => some .Mstore
+  | .Gas => some .Gas
+  | .Return => some .Return
   | _ => none
 
 /-- the functions that the statements define, as {lit}`defs` of the Yul semantics; the function
@@ -168,9 +162,8 @@ def cdefs (q : List Nat) : Nat → List Statement → List (Identifier × FunInf
   | j, _ :: ss => cdefs q (j + 1) ss
 
 /-- the context with the functions of the statements in scope -/
-def scope (ctx : Ctx) (q : List Nat) (ss : List Statement) : Except Error Ctx :=
-  let fs := cdefs q 0 ss
-  if (fs.map (·.1)).Nodup then .ok { ctx with funs := fs :: ctx.funs } else .error .duplicate
+def scope (ctx : Ctx) (q : List Nat) (ss : List Statement) : Ctx :=
+  { ctx with funs := cdefs q 0 ss :: ctx.funs }
 
 /-- remove the variables above the first {name}`n`, and jump to {name}`l` -/
 def jumpOut (vars : List Identifier) (n : Nat) (l : Label) : Code :=
@@ -185,31 +178,24 @@ def assign (vars : List Identifier) : List Identifier → Except Error Code
 
 /-! ## Expressions
 
-{lit}`compileExpr ctx q d e k`: the code of the expression {lit}`e` at the path {lit}`q`, with
-{lit}`d` values above the variables. The code puts {lit}`k` values on the stack, or the compiler
-gives an error.
+{lit}`compileExpr ctx q d e`: the code of the expression {lit}`e` at the path {lit}`q`, with
+{lit}`d` values above the variables. The code puts the values of {lit}`e` on the stack.
 -/
 
 mutual
 
-def compileExpr (ctx : Ctx) (q : List Nat) (d : Nat) : Expression → Nat → Except Error Code
-  | .Literal l, k => do
-    unless k = 1 do throw .arity
-    return [.op (pushNat 32 (Clocked.literalValue l).toNat)]
-  | .Identifier x, k => do
-    unless k = 1 do throw .arity
+def compileExpr (ctx : Ctx) (q : List Nat) (d : Nat) : Expression → Except Error Code
+  | .Literal l => return [.op (pushNat 32 (Clocked.literalValue l).toNat)]
+  | .Identifier x => do
     let some j := ctx.vars.idxOf? x | throw .unbound
     return [← dup (d + j + 1)]
-  | .FunctionCall f args, k =>
+  | .FunctionCall f args =>
     match Yul.EVM.dialect.builtin f with
     | some (kinds, mk) => do
-      let some b := mk (literalArgs kinds args) | throw .unsupported
-      let some (i, n, outs) := builtinOp b | throw .unsupported
-      unless args.length = n ∧ k = outs do throw .arity
+      let some i := mk (literalArgs kinds args) >>= builtinOp | throw .unsupported
       return (← compileArgs ctx q d args) ++ [.op i]
     | none => do
       let some (fn, _) := ctx.funs.find? f | throw .unbound
-      unless args.length = fn.params ∧ k = fn.rets do throw .arity
       let args ← compileArgs ctx q (d + 1 + fn.rets) args
       return [.push (q, 0)] ++ List.replicate fn.rets push0 ++ args ++
         [.push fn.label, .op .Jump, .label (q, 0)]
@@ -220,7 +206,7 @@ def compileArgs (ctx : Ctx) (q : List Nat) (d : Nat) : List Expression → Excep
   | [] => .ok []
   | e :: es => do
     let c ← compileArgs ctx q d es
-    return c ++ (← compileExpr ctx (q ++ [es.length]) (d + es.length) e 1)
+    return c ++ (← compileExpr ctx (q ++ [es.length]) (d + es.length) e)
 
 end
 
@@ -254,25 +240,24 @@ mutual
 def compileStmt (ctx : Ctx) (q : List Nat) : Statement → Except Error (Code × List Identifier)
   | .Block b => return (← compileBlock ctx q b, ctx.vars)
   | .FunctionDefinition _ ps rs body => do
-    unless (ps ++ rs).Nodup do throw .duplicate
     let cb ← compileBlock (funCtx ctx.funs q ps rs) (q ++ [0]) body
     let c ← funCode q ps.length rs.length cb
     return ([.push (q, 1), .op .Jump] ++ c ++ [.label (q, 1)], ctx.vars)
   | .VariableDeclaration xs none => return (List.replicate xs.length push0, xs ++ ctx.vars)
-  | .VariableDeclaration xs (some e) => return (← compileExpr ctx q 0 e xs.length, xs ++ ctx.vars)
+  | .VariableDeclaration xs (some e) => return (← compileExpr ctx q 0 e, xs ++ ctx.vars)
   | .Assignment xs e => do
-    let c ← compileExpr ctx q 0 e xs.length
+    let c ← compileExpr ctx q 0 e
     return (c ++ (← assign ctx.vars xs), ctx.vars)
   | .If c b => do
-    let cc ← compileExpr ctx (q ++ [0]) 0 c 1
+    let cc ← compileExpr ctx (q ++ [0]) 0 c
     let cb ← compileBlock ctx (q ++ [1]) b
     return (cc ++ [push0, .op .Eq, .push (q, 0), .op .Jumpi] ++ cb ++ [.label (q, 0)], ctx.vars)
-  | .Expression e => return (← compileExpr ctx q 0 e 0, ctx.vars)
+  | .Expression e => return (← compileExpr ctx q 0 e, ctx.vars)
   | .ForLoop ⟨init⟩ c post body => do
-    let ctxi ← scope { ctx with loop := none } (q ++ [0]) init
-    let (ci, vars) ← compileStmts ctxi (q ++ [0]) 0 init
-    let ctxi := { ctxi with vars }
-    let cc ← compileExpr ctxi (q ++ [1]) 0 c 1
+    -- a well-formed init block defines no functions: no new scope
+    let (ci, vars) ← compileStmts { ctx with loop := none } (q ++ [0]) 0 init
+    let ctxi := { ctx with loop := none, vars }
+    let cc ← compileExpr ctxi (q ++ [1]) 0 c
     let cb ← compileBlock { ctxi with loop := some ((q, 2), (q, 1), vars.length) } (q ++ [2]) body
     let cp ← compileBlock ctxi (q ++ [3]) post
     return (ci ++ loopCode q cc cb cp ++ pops (vars.length - ctx.vars.length), ctx.vars)
@@ -293,7 +278,7 @@ def compileStmt (ctx : Ctx) (q : List Nat) : Statement → Except Error (Code ×
 its end -/
 def compileBlock (ctx : Ctx) (q : List Nat) : Block → Except Error Code
   | ⟨ss⟩ => do
-    let (c, vars) ← compileStmts (← scope ctx q ss) q 0 ss
+    let (c, vars) ← compileStmts (scope ctx q ss) q 0 ss
     return c ++ pops (vars.length - ctx.vars.length)
 
 /-- the statements; the statement {name}`j` is at the path {lit}`q ++ [j]` -/
@@ -341,11 +326,10 @@ def assemble (prog : Code) : Except Error (List UInt8) := do
 /-! ## The compiler -/
 
 /-- the bytecode of the code of the top object, or the reason why there is none -/
-def compileE (P : Object) : Except Error (List UInt8) := do
-  unless decide (P.WellFormed Yul.EVM.dialect) do throw .notWellFormed
-  let c ← compileBlock { vars := [], funs := [] } [] P.code
+def compileE (P : WFObject) : Except Error (List UInt8) := do
+  let c ← compileBlock { vars := [], funs := [] } [] P.1.code
   assemble (c ++ [.op .Stop])
 
-def compile (P : Object) : Option (List UInt8) := (compileE P).toOption
+def compile (P : WFObject) : Option (List UInt8) := (compileE P).toOption
 
 end Compiler
