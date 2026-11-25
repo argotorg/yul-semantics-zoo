@@ -136,4 +136,5 @@ iteration and each function call. In EVM, it decreases once for each instruction
   readings of the concrete run. It gives no statement about `P` at the real gas cost, because `P`
   has no real gas cost.
 - **No statement about OOG.** An `OOG` run of the concrete EVM gives no information about `P`. If
-  `P` diverges, each concrete run of its bytecode goes `OOG`.
+  `P` diverges for input `i` and each `ρ`, then each concrete run of its bytecode with input `i`
+  goes `OOG`.
