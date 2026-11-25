@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.Yul.Lemmas.Clocked
+import YulSemnaticsZoo.Yul.Semantics.Clocked.Lemmas
 
 set_option doc.verso true
 
@@ -9,7 +9,7 @@ set_option doc.verso true
 
 {lit}`st.addClock d` is the state {lit}`st` with {lit}`d` more clock, and {lit}`r.shift d` is the
 result {lit}`r` with {lit}`d` more clock at the end. The proof of (Mono) for each function of the
-interpreter is in {lit}`YulSemnaticsZoo/Yul/Lemmas/Clocked.lean`.
+interpreter is in {lit}`YulSemnaticsZoo/Yul/Semantics/Clocked/Lemmas.lean`.
 -/
 
 namespace Yul.Clocked

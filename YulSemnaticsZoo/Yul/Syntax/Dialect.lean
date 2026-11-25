@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.Yul.Syntax
+import YulSemnaticsZoo.Yul.Syntax.Syntax
 
 set_option doc.verso true
 

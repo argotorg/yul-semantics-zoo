@@ -1,13 +1,13 @@
 import Lean.Data.Json
 import Fuzz.YulGen
-import YulSemnaticsZoo.Yul.Clocked
-import YulSemnaticsZoo.EVM.Printer
+import YulSemnaticsZoo.Yul.Semantics.Clocked.Interp
+import YulSemnaticsZoo.EVM.Syntax.Printer
 
 /-!
 # Fuzzing the clocked Yul semantics against solc and geth
 
-For a random object `o` that is well-formed in the subset dialect (`Fuzz.Yul.subsetObject`) and
-random calldata:
+For a random object `o` that is well-formed in the EVM dialect and calls only the 8 builtins
+that the clocked semantics defines (`Fuzz.Yul.subsetObject`), and random calldata:
 - solc compiles `o` without optimization steps (`solc`);
 - `evm run` (geth) runs the bytecode with the calldata and `gasLimit` gas; a second run with a
   trace gives the value that each `GAS` pushes (`geth`);
@@ -125,8 +125,8 @@ inductive Case where
 /-- a difference between geth and the interpreter on `o` and `calldata` -/
 def check (o : Object) (calldata : List UInt8) : IO (Except String Case) := do
   let text := o.print
-  if !decide (o.WellFormed Subset.dialect) then
-    return .error s!"the object is not well-formed in the subset dialect\n{text}"
+  if !decide (o.WellFormed EVM.dialect) then
+    return .error s!"the object is not well-formed in the EVM dialect\n{text}"
   let .ok code ← solc text | return .ok .solcFailed
   match ← geth code calldata with
   | .error e => return .error e

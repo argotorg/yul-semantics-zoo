@@ -1,7 +1,7 @@
-import YulSemnaticsZoo.Yul.Quote
-import YulSemnaticsZoo.Yul.Printer
-import YulSemnaticsZoo.Yul.WellFormed
-import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.Yul.Syntax.Quote
+import YulSemnaticsZoo.Yul.Syntax.Printer
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
+import YulSemnaticsZoo.Yul.Syntax.EVM
 
 /-! `Yul.Object.parse_print` and the others prove that parsing printed text gives the AST. These
 tests are for the text that the printer does not print. -/

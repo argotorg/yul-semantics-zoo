@@ -65,7 +65,9 @@ inductive Result where
   | exception
   /-- an instruction or builtin that the semantics do not define: {lit}`CODECOPY`,
   {lit}`EXTCODECOPY`, {lit}`CREATE` or {lit}`CALL`, or an opcode of the real EVM that the tiny
-  EVM does not have, for example {lit}`SSTORE` -/
+  EVM does not have, for example {lit}`SSTORE`; in Yul, each builtin of the EVM dialect other
+  than {lit}`add`, {lit}`lt`, {lit}`eq`, {lit}`calldataload`, {lit}`mload`, {lit}`mstore`,
+  {lit}`gas` and {lit}`return` -/
   | unsupported
   deriving DecidableEq, Repr
 

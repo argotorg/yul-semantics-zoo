@@ -1,7 +1,7 @@
 import Lean.Data.Json
 import Fuzz.Bytecode
-import YulSemnaticsZoo.EVM.Gas
-import YulSemnaticsZoo.EVM.Printer
+import YulSemnaticsZoo.EVM.Semantics.Clocked.Gas
+import YulSemnaticsZoo.EVM.Syntax.Printer
 
 /-!
 # Fuzzing the concrete EVM semantics against geth

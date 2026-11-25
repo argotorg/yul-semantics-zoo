@@ -1,5 +1,5 @@
-import YulSemnaticsZoo.Yul.Lemmas.Lexer
-import YulSemnaticsZoo.Yul.Valid
+import YulSemnaticsZoo.Yul.Syntax.Lemmas.Lexer
+import YulSemnaticsZoo.Yul.Syntax.Valid
 
 set_option doc.verso true
 

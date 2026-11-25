@@ -25,12 +25,14 @@ Beh    ::= Ends(r : Result) | Diverges
   `ret []`.
 - `exception`: an exceptional halt of the EVM: a bad jump, a stack underflow, or a byte that is
   not an opcode of the real EVM.
-- `unsupported`: the run gets to an instruction that the semantics do not define (`CODECOPY`,
-  `EXTCODECOPY`, `CREATE`, `CALL`, or an opcode of the real EVM that the tiny EVM does not have).
+- `unsupported`: the run gets to an instruction or builtin that the semantics do not define. In
+  EVM: `CODECOPY`, `EXTCODECOPY`, `CREATE`, `CALL`, or an opcode of the real EVM that the tiny EVM
+  does not have. In Yul: each builtin of the EVM dialect other than `add`, `lt`, `eq`,
+  `calldataload`, `mload`, `mstore`, `gas` and `return`, after the evaluation of its arguments.
 
-Only the EVM semantics gives `exception` and `unsupported`. `Result` contains no gas value, no
-storage and no logs: the subsets have no storage and no logs. Each error is a `Result`. Thus a run
-that does not end diverges.
+Only the EVM semantics gives `exception`. The two semantics give `unsupported`. `Result` contains
+no gas value, no storage and no logs: the subsets have no storage and no logs. Each error is a
+`Result`. Thus a run that does not end diverges.
 
 ## Abstract semantics
 
@@ -96,26 +98,46 @@ compile : Yul → EVM
 opt     : Yul → Yul
 ```
 
-1. **Compilation:** `compile(P) ≈ P`.
-2. **Optimization:** `opt(P) ≈ P`.
+1. **Compilation:**
+
+   ```
+   ∀ i ρ.  beh(P, i, ρ) ≠ Ends(unsupported)  →  beh(compile(P), i, ρ) = beh(P, i, ρ)
+   ```
+2. **Optimization:**
+
+   ```
+   ∀ i ρ.  beh(P, i, ρ) ≠ Ends(unsupported)  →  beh(opt(P), i, ρ) = beh(P, i, ρ)
+   ```
 3. **Refinement:** for each EVM program `B`:
 
    ```
    result_C(B, i, g) = some r  →  beh(B, i, reads(B, i, g)) = Ends(r)
    ```
 
+Obligations 1 and 2 are `compile(P) ≈ P` and `opt(P) ≈ P` for only the runs of `P` that do not
+get to a builtin that the Yul semantics does not define. They give no statement about the other
+runs: there, the compiled code of the builtin need not halt with `unsupported` (for example,
+`datasize` compiles to a `PUSH`), and `opt` can remove a call of the builtin whose value is not
+used.
+
 ## Corollary: Yul → abstract EVM → concrete EVM
 
 ```
-result_C(compile(opt(P)), i, g) = some r  →  beh(P, i, ρ) = Ends(r)
+result_C(compile(opt(P)), i, g) = some r
+    →  beh(P, i, ρ) = Ends(r)  ∨  beh(P, i, ρ) = Ends(unsupported)
     where ρ = reads(compile(opt(P)), i, g)
 ```
 
-Proof:
+Thus if `beh(P, i, ρ) ≠ Ends(unsupported)`, then `beh(P, i, ρ) = Ends(r)`. The second disjunct is
+necessary: if `P` halts with `unsupported`, obligations 1 and 2 permit each `r`.
 
-1. Concrete EVM → abstract EVM, by obligation 3: `beh(compile(opt(P)), i, ρ) = Ends(r)`.
-2. Abstract EVM → Yul, by obligation 1: `beh(opt(P), i, ρ) = Ends(r)`.
-3. Yul → Yul, by obligation 2: `beh(P, i, ρ) = Ends(r)`.
+Proof: if `beh(P, i, ρ) = Ends(unsupported)`, the second disjunct is true. Else:
+
+1. Yul → Yul, by obligation 2: `beh(opt(P), i, ρ) = beh(P, i, ρ)`. Thus
+   `beh(opt(P), i, ρ) ≠ Ends(unsupported)`.
+2. Concrete EVM → abstract EVM, by obligation 3: `beh(compile(opt(P)), i, ρ) = Ends(r)`.
+3. Abstract EVM → Yul, by obligation 1 for `opt(P)`, with step 1: `beh(opt(P), i, ρ) = Ends(r)`.
+   With step 1, `beh(P, i, ρ) = Ends(r)`.
 
 ## Semantic styles
 
@@ -157,8 +179,8 @@ each function call. In EVM, it decreases once for each instruction.
     "yulDetails": {"optimizerSteps": ":", "stackAllocation": false}}}
   ```
 - **One direction at the concrete level.** The corollary gives the behaviour of `P` for the
-  readings of the concrete run. It gives no statement about `P` at the real gas cost, because `P`
-  has no real gas cost.
+  readings of the concrete run, if `P` does not halt with `unsupported`. It gives no statement
+  about `P` at the real gas cost, because `P` has no real gas cost.
 - **No statement about resource failures.** A run of the concrete EVM that goes out of gas or has
   a stack overflow gives no information about `P`. If `P` diverges for input `i` and each `ρ`,
   then each concrete run of its bytecode with input `i` has a resource failure. Yul has no limit on

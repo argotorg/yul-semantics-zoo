@@ -1,5 +1,5 @@
 import Fuzz.Gen
-import YulSemnaticsZoo.EVM.Syntax
+import YulSemnaticsZoo.EVM.Syntax.Syntax
 
 /-!
 # Random bytecode for the semantics fuzzers

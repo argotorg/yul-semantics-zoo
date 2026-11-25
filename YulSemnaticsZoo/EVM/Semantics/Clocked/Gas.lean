@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Semantics
+import YulSemnaticsZoo.EVM.Semantics.Clocked.Step
 
 set_option doc.verso true
 

@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Gas
+import YulSemnaticsZoo.EVM.Semantics.Clocked.Gas
 import Fuzz.Bytecode
 
 namespace EVM.Test

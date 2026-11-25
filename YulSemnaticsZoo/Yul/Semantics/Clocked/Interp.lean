@@ -1,4 +1,5 @@
-import YulSemnaticsZoo.Yul.Subset
+import YulSemnaticsZoo.Yul.Syntax.EVM
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
 import YulSemnaticsZoo.Semantics
 
 set_option doc.verso true
@@ -8,10 +9,16 @@ set_option doc.verso true
 
 Reference: [the formal specification of Yul](https://docs.soliditylang.org/en/v0.8.38/yul.html#formal-specification)
 
-A big-step interpreter for Yul in the subset dialect ({lit}`Yul.Subset.dialect`). It is a total
+A big-step interpreter for Yul in the EVM dialect ({lit}`Yul.EVM.dialect`). It is a total
 function. The clock is part of the state. It decreases by 1 at each loop iteration (before the
 condition) and at each call of a Yul function. When the clock is 0 at one of these points, the
 outcome is {lit}`timeout`. Nothing else uses the clock.
+
+The semantics defines 8 builtins: {lit}`add`, {lit}`lt`, {lit}`eq`, {lit}`calldataload`,
+{lit}`mload`, {lit}`mstore`, {lit}`gas` and {lit}`return`. A call of each other builtin of the
+dialect halts the run with {lit}`unsupported`, as the EVM semantics does for an instruction that it
+does not define. The halt comes after the arguments, as for the 8 builtins: the arguments can read
+gas, halt or time out before it.
 
 The input {lit}`i` and the readings {lit}`ρ` are parameters. The n-th call of {lit}`gas()` gives
 {lit}`ρ n`. There is no gas counter. Memory has no size limit, and the depth of function calls has
@@ -32,6 +39,8 @@ The semantics is total, and for an AST that is not well-formed it does the simpl
 * An unbound variable gives 0. An assignment to an unbound variable has no effect.
 * A call of a name that is not a builtin and not a function in scope gives no values. A builtin
   name is always the builtin.
+* A call of a builtin outside the 8 halts the run with {lit}`unsupported`, also if its literal
+  arguments are not valid. (Only builtins outside the 8 have literal arguments.)
 * A missing value (an argument, or a value for a variable) is 0. An extra value has no effect.
 * A literal number is taken modulo 2^256, and a literal string has its first 32 bytes.
 * {lit}`break`, {lit}`continue` and {lit}`leave` stop the statements of each block until a loop or a
@@ -160,19 +169,21 @@ section
 
 variable (i : Input) (ρ : Readings)
 
-/-- a builtin with the arguments {name}`args` -/
-def builtin (b : Subset.Builtin) (args : List Word) (st : State) : Res st.clock Values :=
+/-- a builtin with the arguments {name}`args`, or {name}`none` for literal arguments that the
+dialect does not accept. Each builtin outside the 8 halts with {name}`Result.unsupported`. -/
+def builtin (b : Option EVM.Builtin) (args : List Word) (st : State) : Res st.clock Values :=
   let x := args.getD 0 0
   let y := args.getD 1 0
   match b with
-  | .Add => ⟨.ok [x + y], st, Nat.le_refl _⟩
-  | .Lt => ⟨.ok [lt x y], st, Nat.le_refl _⟩
-  | .Eq => ⟨.ok [eq x y], st, Nat.le_refl _⟩
-  | .Calldataload => ⟨.ok [calldataload i x], st, Nat.le_refl _⟩
-  | .Mload => ⟨.ok [mload st.mem x], st, Nat.le_refl _⟩
-  | .Mstore => ⟨.ok [], { st with mem := mstore st.mem x y }, Nat.le_refl _⟩
-  | .Gas => ⟨.ok [ρ st.reads], { st with reads := st.reads + 1 }, Nat.le_refl _⟩
-  | .Return => ⟨.halt (.ret (read st.mem x y)), st, Nat.le_refl _⟩
+  | some .Add => ⟨.ok [x + y], st, Nat.le_refl _⟩
+  | some .Lt => ⟨.ok [lt x y], st, Nat.le_refl _⟩
+  | some .Eq => ⟨.ok [eq x y], st, Nat.le_refl _⟩
+  | some .Calldataload => ⟨.ok [calldataload i x], st, Nat.le_refl _⟩
+  | some .Mload => ⟨.ok [mload st.mem x], st, Nat.le_refl _⟩
+  | some .Mstore => ⟨.ok [], { st with mem := mstore st.mem x y }, Nat.le_refl _⟩
+  | some .Gas => ⟨.ok [ρ st.reads], { st with reads := st.reads + 1 }, Nat.le_refl _⟩
+  | some .Return => ⟨.halt (.ret (read st.mem x y)), st, Nat.le_refl _⟩
+  | _ => ⟨.halt .unsupported, st, Nat.le_refl _⟩
 
 mutual
 
@@ -262,8 +273,8 @@ def eval (fs : Funs) (st : State) : Expression → Res st.clock Values
     let ⟨v, st1, h1⟩ := evals fs st args
     match v with
     | .ok vs =>
-      match Subset.builtin? f, fs.find? f with
-      | some b, _ => (builtin i ρ b vs st1).up h1
+      match EVM.dialect.builtin f, fs.find? f with
+      | some (kinds, mk), _ => (builtin i ρ (mk (literalArgs kinds args)) vs st1).up h1
       | none, none => ⟨.ok [], st1, h1⟩
       | none, some (fn, fs') =>
         if _h0 : st1.clock = 0 then ⟨.timeout, st1, h1⟩ else
@@ -329,7 +340,7 @@ def Behaves (P : Object) (i : Input) (ρ : Readings) : Beh → Prop
 
 open Classical in
 /-- the behaviour of the run: the result of a clock that gives one, else divergence.
-{lit}`ClockedTheorems` shows that it is the only behaviour. -/
+The theorem {lit}`beh_eq` shows that it is the only behaviour. -/
 noncomputable def beh (P : Object) (i : Input) (ρ : Readings) : Beh :=
   if h : ∃ r k, run P i ρ k = some r then .ends h.choose else .diverges
 

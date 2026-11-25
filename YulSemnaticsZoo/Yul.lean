@@ -1,21 +1,22 @@
-import YulSemnaticsZoo.Yul.Syntax
-import YulSemnaticsZoo.Yul.Dialect
-import YulSemnaticsZoo.Yul.EVM
-import YulSemnaticsZoo.Yul.Lexer
-import YulSemnaticsZoo.Yul.Printer
-import YulSemnaticsZoo.Yul.Parser
-import YulSemnaticsZoo.Yul.Valid
-import YulSemnaticsZoo.Yul.WellFormed
-import YulSemnaticsZoo.Yul.Theorems
-import YulSemnaticsZoo.Yul.Quote
-import YulSemnaticsZoo.Yul.Subset
-import YulSemnaticsZoo.Yul.Clocked
-import YulSemnaticsZoo.Yul.ClockedTheorems
+import YulSemnaticsZoo.Yul.Syntax.Syntax
+import YulSemnaticsZoo.Yul.Syntax.Dialect
+import YulSemnaticsZoo.Yul.Syntax.EVM
+import YulSemnaticsZoo.Yul.Syntax.Lexer
+import YulSemnaticsZoo.Yul.Syntax.Printer
+import YulSemnaticsZoo.Yul.Syntax.Parser
+import YulSemnaticsZoo.Yul.Syntax.Valid
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
+import YulSemnaticsZoo.Yul.Syntax.Theorems
+import YulSemnaticsZoo.Yul.Syntax.Quote
+import YulSemnaticsZoo.Yul.Semantics.Clocked.Interp
+import YulSemnaticsZoo.Yul.Semantics.Clocked.Theorems
 
 set_option doc.verso true
 
 /-!
 # Yul
+
+The pages under *Syntax*:
 
 - *Syntax*: the abstract syntax, with the names of the grammar in the Solidity docs. A *dialect*
   gives the builtins; the *EVM dialect* has the builtins of the small EVM and the builtins of
@@ -30,9 +31,12 @@ set_option doc.verso true
   parser {lit}`Object.parseWellFormed` gives only well-formed objects. {lit}`lake test` fuzzes
   {lit}`Object.WellFormed` in the EVM dialect against the analysis of solc.
 - *Quote*: {lit}`[yul| … |]` is Yul text in Lean, parsed when Lean elaborates it.
-- *Subset dialect*: the 8 builtins {lit}`add`, {lit}`lt`, {lit}`eq`, {lit}`calldataload`,
-  {lit}`mload`, {lit}`mstore`, {lit}`gas` and {lit}`return`.
-- *Clocked semantics*: a big-step interpreter for the subset dialect with a clock, and the
-  behaviours of a run. *Clocked theorems*: (Mono), (Det) and (Total). {lit}`lake test` fuzzes
-  the interpreter against solc and geth.
+
+The pages under *Semantics*, *Clocked*:
+
+- *Clocked semantics*: a big-step interpreter in the EVM dialect with a clock, and the behaviours
+  of a run. It defines the 8 builtins {lit}`add`, {lit}`lt`, {lit}`eq`, {lit}`calldataload`,
+  {lit}`mload`, {lit}`mstore`, {lit}`gas` and {lit}`return`; each other builtin halts the run
+  with {lit}`unsupported`. {lit}`lake test` fuzzes the interpreter against solc and geth.
+- *Clocked theorems*: (Mono), (Det) and (Total).
 -/

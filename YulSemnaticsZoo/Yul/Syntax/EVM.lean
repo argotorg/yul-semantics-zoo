@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.Yul.Dialect
+import YulSemnaticsZoo.Yul.Syntax.Dialect
 
 set_option doc.verso true
 
@@ -136,7 +136,9 @@ def builtin : Identifier → Option (List Arg × (List Literal → Option Builti
   | f => (verbatim? f).map fun (i, o) =>
     (.Literal :: List.replicate i .Expression, fun ls => (code? ls).map (.Verbatim i o))
 
-def dialect : Dialect where
+-- reducible: then `simp` sees that `dialect.Builtin` is `Builtin` (the proofs of the clocked
+-- semantics need this)
+abbrev dialect : Dialect where
   Builtin := Builtin
   outs := outs
   builtin := builtin

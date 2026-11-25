@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Printer
+import YulSemnaticsZoo.EVM.Syntax.Printer
 
 /-!
 # Fuzzing the EVM encoding against solc

@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.Yul.EVM
+import YulSemnaticsZoo.Yul.Syntax.EVM
 
 namespace Yul.EVM.Test
 open Yul Yul.EVM

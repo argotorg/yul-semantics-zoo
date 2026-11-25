@@ -65,6 +65,7 @@ The EVM has a clocked semantics with two gas models: an abstract model, where th
 {lit}`GAS` pushes {lit}`ρ n` and the stack has no limit, and a concrete model with the real gas
 costs and the stack limit of 1024 words. The concrete model is fuzzed against geth.
 
-{lit}`Yul.Clocked` is a clocked big-step semantics for a subset of Yul (the subset dialect), with
-proofs of (Mono), (Det) and (Total). It is fuzzed against solc and geth.
+{lit}`Yul.Clocked` is a clocked big-step semantics for Yul in the EVM dialect, with proofs of
+(Mono), (Det) and (Total). It defines 8 builtins; each other builtin halts the run with
+{lit}`unsupported`. It is fuzzed against solc and geth.
 -/

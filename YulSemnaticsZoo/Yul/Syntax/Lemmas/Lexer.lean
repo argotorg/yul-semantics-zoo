@@ -1,5 +1,5 @@
-import YulSemnaticsZoo.Yul.Lexer
-import YulSemnaticsZoo.Yul.Printer
+import YulSemnaticsZoo.Yul.Syntax.Lexer
+import YulSemnaticsZoo.Yul.Syntax.Printer
 
 set_option doc.verso true
 

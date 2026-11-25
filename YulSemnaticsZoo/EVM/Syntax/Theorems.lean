@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Lemmas.Encode
+import YulSemnaticsZoo.EVM.Syntax.Lemmas.Encode
 
 set_option doc.verso true
 

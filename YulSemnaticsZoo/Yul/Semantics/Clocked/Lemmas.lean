@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.Yul.Clocked
+import YulSemnaticsZoo.Yul.Semantics.Clocked.Interp
 
 set_option doc.verso true
 
@@ -71,7 +71,9 @@ theorem evals_st : (evals i ρ fs st es).st = (evalsP i ρ fs st es).2 := rfl
 /-- a builtin does not use the clock -/
 theorem builtinP_addClock : builtinP i ρ b vs (st.addClock d) =
     ((builtinP i ρ b vs st).1, (builtinP i ρ b vs st).2.addClock d) := by
-  cases b <;> rfl
+  rcases b with _ | b
+  · rfl
+  · cases b <;> rfl
 
 -- each case uses only some of the lemmas
 set_option linter.unusedSimpArgs false in

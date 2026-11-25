@@ -1,4 +1,4 @@
-import YulSemnaticsZoo.EVM.Syntax
+import YulSemnaticsZoo.EVM.Syntax.Syntax
 
 set_option doc.verso true
 

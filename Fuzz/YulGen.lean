@@ -1,6 +1,6 @@
 import Fuzz.Gen
-import YulSemnaticsZoo.Yul.Printer
-import YulSemnaticsZoo.Yul.WellFormed
+import YulSemnaticsZoo.Yul.Syntax.Printer
+import YulSemnaticsZoo.Yul.Syntax.WellFormed
 
 /-!
 # Random Yul objects, and random text for them
@@ -11,8 +11,8 @@ arguments and results, `break` and `continue` are in a loop body, `leave` is in 
 `datasize` and `dataoffset` refer to sub-objects and data. `mutateObject` changes an object so
 that it can break one of these rules. `text` prints the tokens of an object with random
 spellings that the printer does not use: comments, white space, hex numbers, escapes and hex
-literals. `subsetObject` makes objects that are well-formed in the subset dialect, for the
-fuzzer of the clocked semantics.
+literals. `subsetObject` makes objects that are well-formed in the EVM dialect and call only the
+8 builtins of the clocked semantics, for the fuzzer of the clocked semantics.
 -/
 
 namespace Fuzz.Yul
@@ -33,11 +33,11 @@ def builtins1 : List (String × Nat) :=
 def builtins0 : List (String × Nat) :=
   [("mstore", 2), ("codecopy", 3), ("extcodecopy", 4), ("return", 2), ("datacopy", 3)]
 
-/-- builtins of the subset dialect with one result -/
+/-- the builtins of the clocked semantics with one result -/
 def subset1 : List (String × Nat) :=
   [("add", 2), ("lt", 2), ("eq", 2), ("calldataload", 1), ("mload", 1), ("gas", 0)]
 
-/-- builtins of the subset dialect with no result -/
+/-- the builtins of the clocked semantics with no result -/
 def subset0 : List (String × Nat) := [("mstore", 2), ("return", 2)]
 
 structure Env where
@@ -49,8 +49,8 @@ structure Env where
   paths : List String := []
   inLoop : Bool := false
   inFun : Bool := false
-  /-- only the builtins of the subset dialect, and often small offsets and sizes for memory and
-  calldata, so that the runs stay small -/
+  /-- only the 8 builtins of the clocked semantics, and often small offsets and sizes for memory
+  and calldata, so that the runs stay small -/
   subset : Bool := false
 
 instance : Inhabited Env := ⟨{}⟩
@@ -236,9 +236,9 @@ partial def object (d : Nat) : YGen Object := do
   -- (solidity issue 9470)
   return { o with code := ← block { paths := o.dataNames.filter (!(subData o).contains ·) } true 3 }
 
-/-- an object that is well-formed in the subset dialect; it has no sub-objects and no data,
-since only the code of the top object has a meaning there. Half of the objects end with a
-`return` of the first 128 bytes of memory. -/
+/-- an object that is well-formed in the EVM dialect and calls only the 8 builtins of the clocked
+semantics; it has no sub-objects and no data, since only the code of the top object has a meaning
+there. Half of the objects end with a `return` of the first 128 bytes of memory. -/
 def subsetObject : YGen Object := do
   let ⟨ss⟩ ← block { subset := true } true 3
   let ret := Statement.Expression (.FunctionCall "return"
